@@ -1,0 +1,78 @@
+---
+title: "NSPIRE Inspection Optimization Model: Conceptual Framework"
+author: "Mathematical Modeling & Simulation"
+date: "`r Sys.Date()`"
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    theme: cosmo
+    math: true
+  pdf:
+    geometry: "margin=1in"
+---
+
+# 1. Introduction
+
+This document outlines the foundational mathematical model for optimizing maintenance resource allocation ahead of an NSPIRE (National Standards for the Physical Inspection of Real Estate) inspection. The objective is to maximize the expected effective score by traversing a dependency-constrained network of tasks, evaluated via Monte Carlo simulations to account for operational stochastics.
+
+# 2. The NSPIRE Scoring Mechanism
+
+The inspection divides a property into distinct locations and evaluates defects based on severity. 
+
+## 2.1. Definitions and Sets
+* **Severity:** $s \in \{\text{LT}, \text{S}, \text{STD}\}$ (Life-Threatening, Severe, Standard)
+* **Location:** $l \in \{\text{Unit}, \text{Inside}, \text{Outside}\}$
+* $N$: Total number of units in the property (Population).
+* $n$: Number of units inspected (Sample size).
+* $C_{s,l}$: True total count of defects existing in the property.
+* $c_{s,l}$: Observed count of defects recorded during the inspection.
+* $w_{s,l}$: Static point weight (penalty) assigned to a defect.
+
+## 2.2. The Deduction Function
+The total point deduction $D$ is a summation over all severities and locations, normalized by the sample size:
+
+$$D = \sum_{s \in \{\text{LT}, \text{S}, \text{STD}\}} \sum_{l \in \{\text{Unit}, \text{Inside}, \text{Outside}\}} \left( \frac{c_{s,l}}{n} \cdot w_{s,l} \right)$$
+
+## 2.3. The Raw Continuous Score
+The base score originates at 100 and is bounded at zero using the Heaviside step function $H(x)$:
+
+$$S_{raw} = (100 - D) \cdot H(100 - D)$$
+
+## 2.4. The Operational Compliance Function (Failsafe)
+A score $\ge 60$ mathematically passes, but the presence of *any* Life-Threatening (LT) defect forces an immediate 24-hour mitigation compliance failure. Let $n_{LT}$ represent the total observed LT defects:
+
+$$n_{LT} = \sum_{l} c_{\text{LT},l}$$
+
+The **Effective Score Function** $S_{eff}$ zeroes out the numerical score if an LT is present, acting as an absolute penalty in the optimization algorithm:
+
+$$S_{eff} = S_{raw} \cdot H(0.5 - n_{LT})$$
+
+# 3. Probabilistic Sampling and Expected Deductions
+
+While defects in `Inside` and `Outside` locations are deterministic ($c_{s,l} = C_{s,l}$), unit defects are sampled without replacement from $N$. Thus, $c_{s,\text{Unit}}$ follows a hypergeometric distribution.
+
+The **Expected Value** of observed unit defects is:
+$$E[c_{s,\text{Unit}}] = n \cdot \frac{C_{s,\text{Unit}}}{N}$$
+
+Substituting this into the Expected Total Deduction $E[D]$:
+
+$$E[D] = \sum_{s} \left[ \frac{C_{s,\text{Inside}} \cdot w_{s,\text{Inside}}}{n} + \frac{C_{s,\text{Outside}} \cdot w_{s,\text{Outside}}}{n} + \frac{C_{s,\text{Unit}} \cdot w_{s,\text{Unit}}}{N} \right]$$
+
+*Note: The sample size $n$ cancels out for unit defects, shifting the optimization focus to the true building density $C/N$.*
+
+# 4. Resource Mapping and Graph Topology
+
+Maintenance tasks are not independent. The sequence of work forms a **Directed Acyclic Graph (DAG)** where each task $i$ is a vertex $V_i$ with an expected execution time $t_i$ and material cost $m_i$.
+
+## 4.1. Edge Constraints
+1.  **Sequential Precedence:** A directed edge $V_A \to V_B$ requires the start time of $B$ to be $\ge$ the end time of $A$.
+2.  **Temporal Blocking:** Certain vertices (e.g., $V_{glaze}$) impose a local resource freeze, locking a spatial node (e.g., the bathroom) for a time interval $\Delta t$.
+3.  **Mutually Exclusive Pruning:** If a higher-order vertex $V_{replace}$ is activated, redundant child vertices $V_{repair}$ are pruned from the DAG ($t_{repair} \to 0$).
+
+## 4.2. Stochastic Triggers (Monte Carlo Parameters)
+Because expected values commute but operational maximums do not, the network is evaluated via Monte Carlo simulation to capture "fat tail" risks.
+
+* **Binary Access Shocks:** $B_{access} \sim \text{Bernoulli}(p_{deny})$. If triggered, the unit sub-graph is delayed by 24 hours.
+* **Branching Spawns:** $B_{rot} \sim \text{Bernoulli}(p_{rot})$. Execution of $V_i$ has a probability of dynamically spawning a mandatory child vertex $V_{hidden\_damage}$ into the DAG.
+* **Execution Variance:** $t_i$ follows a specified distribution (e.g., PERT or Log-Normal) to simulate realistic operational friction.

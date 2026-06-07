@@ -1,15 +1,14 @@
 ---
-title: "NSPIRE Inspection Optimization Model: Conceptual Framework"
-author: "Mathematical Modeling & Simulation"
-date: "`r Sys.Date()`"
+title: "NSPIRE Inspection Optimization Model"
+author: "Joël R. Pradines, Ph.D."
+date: today
 format:
   html:
     toc: true
     toc-depth: 3
+    toc-location: left
     theme: cosmo
     math: true
-  pdf:
-    geometry: "margin=1in"
 ---
 
 # 1. Introduction
@@ -76,3 +75,24 @@ Because expected values commute but operational maximums do not, the network is 
 * **Binary Access Shocks:** $B_{access} \sim \text{Bernoulli}(p_{deny})$. If triggered, the unit sub-graph is delayed by 24 hours.
 * **Branching Spawns:** $B_{rot} \sim \text{Bernoulli}(p_{rot})$. Execution of $V_i$ has a probability of dynamically spawning a mandatory child vertex $V_{hidden\_damage}$ into the DAG.
 * **Execution Variance:** $t_i$ follows a specified distribution (e.g., PERT or Log-Normal) to simulate realistic operational friction.
+
+---
+
+<style>
+.floating-copyright {
+  position: fixed;
+  bottom: 15px;
+  left: 15px;
+  font-size: 0.85em;
+  color: #777;
+  background-color: rgba(255, 255, 255, 0.85);
+  padding: 5px 10px;
+  border-radius: 5px;
+  z-index: 1000;
+  pointer-events: none; /* Ensures the text doesn't block your mouse from clicking things behind it */
+}
+</style>
+
+<div class="floating-copyright">
+  &copy; 2026 Joël R. Pradines.<br> All rights reserved.
+</div>

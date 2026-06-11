@@ -22,8 +22,8 @@ The inspection divides a property into distinct locations and evaluates defects 
 ## 2.1. Definitions and Sets
 * **Severity:** $s \in \{\text{LT}, \text{S}, \text{STD}\}$ (Life-Threatening, Severe, Standard)
 * **Location:** $l \in \{\text{Unit}, \text{Inside}, \text{Outside}\}$
-* $N$: Total number of units in the property (Population).
-* $n$: Number of units inspected (Sample size).
+* $N$: Total number of units in the property.
+* $n$: Number of units inspected.
 * $C_{s,l}$: True total count of defects existing in the property.
 * $c_{s,l}$: Observed count of defects recorded during the inspection.
 * $w_{s,l}$: Static point weight (penalty) assigned to a defect.
@@ -43,13 +43,11 @@ A score $\ge 60$ mathematically passes, but the presence of *any* Life-Threateni
 
 $$n_{LT} = \sum_{l} c_{\text{LT},l}$$
 
-The **Effective Score Function** $S_{eff}$ zeroes out the numerical score if an LT is present, acting as an absolute penalty in the optimization algorithm:
-
 $$S_{eff} = S_{raw} \cdot H(0.5 - n_{LT})$$
 
 # 3. Probabilistic Sampling and Expected Deductions
 
-While defects in `Inside` and `Outside` locations are deterministic ($c_{s,l} = C_{s,l}$), unit defects are sampled without replacement from $N$. Thus, $c_{s,\text{Unit}}$ follows a hypergeometric distribution.
+Unit defects are sampled without replacement from $N$. Thus, $c_{s,\text{Unit}}$ follows a hypergeometric distribution.
 
 The **Expected Value** of observed unit defects is:
 $$E[c_{s,\text{Unit}}] = n \cdot \frac{C_{s,\text{Unit}}}{N}$$
@@ -58,24 +56,87 @@ Substituting this into the Expected Total Deduction $E[D]$:
 
 $$E[D] = \sum_{s} \left[ \frac{C_{s,\text{Inside}} \cdot w_{s,\text{Inside}}}{n} + \frac{C_{s,\text{Outside}} \cdot w_{s,\text{Outside}}}{n} + \frac{C_{s,\text{Unit}} \cdot w_{s,\text{Unit}}}{N} \right]$$
 
-*Note: The sample size $n$ cancels out for unit defects, shifting the optimization focus to the true building density $C/N$.*
+# 4. Resource Mapping and Graph Topology (DAG)
 
-# 4. Resource Mapping and Graph Topology
-
-Maintenance tasks are not independent. The sequence of work forms a **Directed Acyclic Graph (DAG)** where each task $i$ is a vertex $V_i$ with an expected execution time $t_i$ and material cost $m_i$.
+Maintenance tasks form a **Directed Acyclic Graph (DAG)** where each task $i$ is a vertex $V_i$ with an expected execution time $t_i$ and material cost $m_i$.
 
 ## 4.1. Edge Constraints
 1.  **Sequential Precedence:** A directed edge $V_A \to V_B$ requires the start time of $B$ to be $\ge$ the end time of $A$.
-2.  **Temporal Blocking:** Certain vertices (e.g., $V_{glaze}$) impose a local resource freeze, locking a spatial node (e.g., the bathroom) for a time interval $\Delta t$.
-3.  **Mutually Exclusive Pruning:** If a higher-order vertex $V_{replace}$ is activated, redundant child vertices $V_{repair}$ are pruned from the DAG ($t_{repair} \to 0$).
+2.  **Temporal Blocking:** Certain vertices impose a local resource freeze, locking a spatial node for a time interval $\Delta t$.
+3.  **Mutually Exclusive Pruning:** If a higher-order vertex $V_{replace}$ is activated, redundant child vertices $V_{repair}$ are pruned ($t_{repair} \to 0$).
 
-## 4.2. Stochastic Triggers (Monte Carlo Parameters)
-Because expected values commute but operational maximums do not, the network is evaluated via Monte Carlo simulation to capture "fat tail" risks.
+# 5. Task Modalities & Execution Constraints
 
-* **Binary Access Shocks:** $B_{access} \sim \text{Bernoulli}(p_{deny})$. If triggered, the unit sub-graph is delayed by 24 hours.
-* **Branching Spawns:** $B_{rot} \sim \text{Bernoulli}(p_{rot})$. Execution of $V_i$ has a probability of dynamically spawning a mandatory child vertex $V_{hidden\_damage}$ into the DAG.
-* **Execution Variance:** $t_i$ follows a specified distribution (e.g., PERT or Log-Normal) to simulate realistic operational friction.
+Task execution times are not normally distributed; they represent distinct physical realities (e.g., a quick adjustment versus a catastrophic replacement). 
 
+## 5.1. Mixture Distributions (PERT)
+Task $i$ exists in state $k \in \{1, 2, 3\}$. The execution time $t_i$ is drawn from a bounded Beta-PERT distribution, weighted by the physical probability of the state ($p_{i,k}$):
+
+$$f(t_i) = \sum_{k} p_{i,k} \cdot \text{PERT}(t; a_k, m_k, b_k)$$
+where $a_k, m_k, b_k$ represent the optimistic, mode, and pessimistic completion times.
+
+## 5.2. Vendor Handoff Nodes
+If a task evaluates to a severe state requiring external licensing or specialization (e.g., licensed plumbing or glazing), the node logic bifurcates:
+* Internal labor time drops to zero ($t_{internal} \to 0$).
+* A schedule lag is injected, drawing from a Uniform distribution: $L \sim \text{Uniform}(l_{min}, l_{max})$ days.
+* A mandatory spatial lockout is triggered (e.g., 24-hour cure time for silicone), forcing the DAG to re-route internal technicians.
+
+# 6. Quality Control & Redundancy
+
+Execution of a task does not guarantee absolute resolution. A task has a baseline probability ($p_{err}$) of being missed or improperly repaired.
+
+* **Serial Execution (Single Technician):** The probability of a defect surviving into the inspection phase is $P(\text{Survive}) = p_{err}$.
+* **Parallel Execution (Dual Technicians):** Applying the "Four Eyes" principle, independent cross-checking drastically reduces error. The joint probability of both technicians missing the defect becomes $P(\text{Survive}) = p_{err}^2$.
+
+Surviving defects directly populate the observed defect count $c_{s,l}$ in the NSPIRE scoring function.
+
+# 7. Predictive Topological Risk (Latent Covariates)
+
+Baseline task probabilities assume a standard asset deterioration rate. However, lack of historical tenant reporting indicates hidden deferred maintenance, warping the DAG's risk topology.
+
+Let $W_u$ be the count of historical service requests for unit $u$. The Unit Risk Multiplier $R_u \in (0, 1]$ follows an exponential decay function:
+
+$$R_u = e^{-\lambda W_u}$$
+
+Where $\lambda$ is a tuning parameter. For units with low reporting ($W_u \to 0$, $R_u \to 1$), probability mass is dynamically shifted from the nominal state ($p_1$) to the catastrophic/vendor state ($p_3$) bounded by a maximum shift factor $\Delta_{max}$:
+
+$$p_3^* = p_3 + (R_u \cdot \Delta_{max})$$
+$$p_1^* = \max(0, p_1 - (R_u \cdot \Delta_{max}))$$
+
+This transforms the engine from a purely stochastic simulator into a predictive prioritization tool for pre-inspection targeting.
+
+
+
+```{r}
+#| label: tbl-tasks-config
+#| tbl-cap: "NSPIRE Task Modalities and Execution Constraints"
+#| echo: false
+#| warning: false
+#| message: false
+
+# Load the required libraries
+library(DT)
+library(readr)
+
+# Read the CSV
+tasks_df <- read_csv("tasks_config.csv")
+
+# Generate and print the interactive table
+datatable(
+  tasks_df,
+  extensions = c('FixedColumns', 'Responsive'),
+  options = list(
+    pageLength = 10,
+    scrollX = TRUE,
+    fixedColumns = list(leftColumns = 5), 
+    autoWidth = TRUE,
+    columnDefs = list(
+      list(className = 'dt-center', targets = "_all")
+    )
+  ),
+  class = 'cell-border stripe hover'
+)
+```
 ---
 
 <style>
@@ -89,7 +150,7 @@ Because expected values commute but operational maximums do not, the network is 
   padding: 5px 10px;
   border-radius: 5px;
   z-index: 1000;
-  pointer-events: none; /* Ensures the text doesn't block your mouse from clicking things behind it */
+  pointer-events: none; 
 }
 </style>
 

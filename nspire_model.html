@@ -7,7 +7,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
 <meta name="author" content="Joël R. Pradines, Ph.D.">
-<meta name="dcterms.date" content="2026-06-06">
+<meta name="dcterms.date" content="2026-06-09">
 
 <title>NSPIRE Inspection Optimization Model</title>
 <style>
@@ -39,6 +39,20 @@ ul.task-list li input[type="checkbox"] {
 <script src="nspire_model_files/libs/bootstrap/bootstrap.min.js"></script>
 <link href="nspire_model_files/libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
 <link href="nspire_model_files/libs/bootstrap/bootstrap-8ffd5f67044e5306d9846f29df41dda5.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<link href="nspire_model_files/libs/htmltools-fill-0.5.9/fill.css" rel="stylesheet">
+<script src="nspire_model_files/libs/htmlwidgets-1.6.4/htmlwidgets.js"></script>
+<link href="nspire_model_files/libs/datatables-css-0.0.0/datatables-crosstalk.css" rel="stylesheet">
+<script src="nspire_model_files/libs/datatables-binding-0.34.0/datatables.js"></script>
+<script src="nspire_model_files/libs/jquery-3.6.0/jquery-3.6.0.min.js"></script>
+<link href="nspire_model_files/libs/dt-core-1.13.6/css/jquery.dataTables.min.css" rel="stylesheet">
+<link href="nspire_model_files/libs/dt-core-1.13.6/css/jquery.dataTables.extra.css" rel="stylesheet">
+<script src="nspire_model_files/libs/dt-core-1.13.6/js/jquery.dataTables.min.js"></script>
+<link href="nspire_model_files/libs/dt-ext-fixedcolumns-1.13.6/css/fixedColumns.dataTables.min.css" rel="stylesheet">
+<script src="nspire_model_files/libs/dt-ext-fixedcolumns-1.13.6/js/dataTables.fixedColumns.min.js"></script>
+<link href="nspire_model_files/libs/dt-ext-responsive-1.13.6/css/responsive.dataTables.min.css" rel="stylesheet">
+<script src="nspire_model_files/libs/dt-ext-responsive-1.13.6/js/dataTables.responsive.min.js"></script>
+<link href="nspire_model_files/libs/crosstalk-1.2.2/css/crosstalk.min.css" rel="stylesheet">
+<script src="nspire_model_files/libs/crosstalk-1.2.2/js/crosstalk.min.js"></script>
 
   <script src="https://cdnjs.cloudflare.com/polyfill/v3/polyfill.min.js?features=es6"></script>
   <script defer="" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js" type="text/javascript"></script>
@@ -89,11 +103,17 @@ window.Quarto = {
   <li><a href="#the-operational-compliance-function-failsafe" id="toc-the-operational-compliance-function-failsafe" class="nav-link" data-scroll-target="#the-operational-compliance-function-failsafe">2.4. The Operational Compliance Function (Failsafe)</a></li>
   </ul></li>
   <li><a href="#probabilistic-sampling-and-expected-deductions" id="toc-probabilistic-sampling-and-expected-deductions" class="nav-link" data-scroll-target="#probabilistic-sampling-and-expected-deductions">3. Probabilistic Sampling and Expected Deductions</a></li>
-  <li><a href="#resource-mapping-and-graph-topology" id="toc-resource-mapping-and-graph-topology" class="nav-link" data-scroll-target="#resource-mapping-and-graph-topology">4. Resource Mapping and Graph Topology</a>
+  <li><a href="#resource-mapping-and-graph-topology-dag" id="toc-resource-mapping-and-graph-topology-dag" class="nav-link" data-scroll-target="#resource-mapping-and-graph-topology-dag">4. Resource Mapping and Graph Topology (DAG)</a>
   <ul class="collapse">
   <li><a href="#edge-constraints" id="toc-edge-constraints" class="nav-link" data-scroll-target="#edge-constraints">4.1. Edge Constraints</a></li>
-  <li><a href="#stochastic-triggers-monte-carlo-parameters" id="toc-stochastic-triggers-monte-carlo-parameters" class="nav-link" data-scroll-target="#stochastic-triggers-monte-carlo-parameters">4.2. Stochastic Triggers (Monte Carlo Parameters)</a></li>
   </ul></li>
+  <li><a href="#task-modalities-execution-constraints" id="toc-task-modalities-execution-constraints" class="nav-link" data-scroll-target="#task-modalities-execution-constraints">5. Task Modalities &amp; Execution Constraints</a>
+  <ul class="collapse">
+  <li><a href="#mixture-distributions-pert" id="toc-mixture-distributions-pert" class="nav-link" data-scroll-target="#mixture-distributions-pert">5.1. Mixture Distributions (PERT)</a></li>
+  <li><a href="#vendor-handoff-nodes" id="toc-vendor-handoff-nodes" class="nav-link" data-scroll-target="#vendor-handoff-nodes">5.2. Vendor Handoff Nodes</a></li>
+  </ul></li>
+  <li><a href="#quality-control-redundancy" id="toc-quality-control-redundancy" class="nav-link" data-scroll-target="#quality-control-redundancy">6. Quality Control &amp; Redundancy</a></li>
+  <li><a href="#predictive-topological-risk-latent-covariates" id="toc-predictive-topological-risk-latent-covariates" class="nav-link" data-scroll-target="#predictive-topological-risk-latent-covariates">7. Predictive Topological Risk (Latent Covariates)</a></li>
   </ul>
 </nav>
 </div>
@@ -120,7 +140,7 @@ window.Quarto = {
     <div>
     <div class="quarto-title-meta-heading">Published</div>
     <div class="quarto-title-meta-contents">
-      <p class="date">June 6, 2026</p>
+      <p class="date">June 9, 2026</p>
     </div>
   </div>
   
@@ -144,8 +164,8 @@ window.Quarto = {
 <ul>
 <li><strong>Severity:</strong> <span class="math inline">\(s \in \{\text{LT}, \text{S}, \text{STD}\}\)</span> (Life-Threatening, Severe, Standard)</li>
 <li><strong>Location:</strong> <span class="math inline">\(l \in \{\text{Unit}, \text{Inside}, \text{Outside}\}\)</span></li>
-<li><span class="math inline">\(N\)</span>: Total number of units in the property (Population).</li>
-<li><span class="math inline">\(n\)</span>: Number of units inspected (Sample size).</li>
+<li><span class="math inline">\(N\)</span>: Total number of units in the property.</li>
+<li><span class="math inline">\(n\)</span>: Number of units inspected.</li>
 <li><span class="math inline">\(C_{s,l}\)</span>: True total count of defects existing in the property.</li>
 <li><span class="math inline">\(c_{s,l}\)</span>: Observed count of defects recorded during the inspection.</li>
 <li><span class="math inline">\(w_{s,l}\)</span>: Static point weight (penalty) assigned to a defect.</li>
@@ -165,37 +185,73 @@ window.Quarto = {
 <h2 class="anchored" data-anchor-id="the-operational-compliance-function-failsafe">2.4. The Operational Compliance Function (Failsafe)</h2>
 <p>A score <span class="math inline">\(\ge 60\)</span> mathematically passes, but the presence of <em>any</em> Life-Threatening (LT) defect forces an immediate 24-hour mitigation compliance failure. Let <span class="math inline">\(n_{LT}\)</span> represent the total observed LT defects:</p>
 <p><span class="math display">\[n_{LT} = \sum_{l} c_{\text{LT},l}\]</span></p>
-<p>The <strong>Effective Score Function</strong> <span class="math inline">\(S_{eff}\)</span> zeroes out the numerical score if an LT is present, acting as an absolute penalty in the optimization algorithm:</p>
 <p><span class="math display">\[S_{eff} = S_{raw} \cdot H(0.5 - n_{LT})\]</span></p>
 </section>
 </section>
 <section id="probabilistic-sampling-and-expected-deductions" class="level1">
 <h1>3. Probabilistic Sampling and Expected Deductions</h1>
-<p>While defects in <code>Inside</code> and <code>Outside</code> locations are deterministic (<span class="math inline">\(c_{s,l} = C_{s,l}\)</span>), unit defects are sampled without replacement from <span class="math inline">\(N\)</span>. Thus, <span class="math inline">\(c_{s,\text{Unit}}\)</span> follows a hypergeometric distribution.</p>
+<p>Unit defects are sampled without replacement from <span class="math inline">\(N\)</span>. Thus, <span class="math inline">\(c_{s,\text{Unit}}\)</span> follows a hypergeometric distribution.</p>
 <p>The <strong>Expected Value</strong> of observed unit defects is: <span class="math display">\[E[c_{s,\text{Unit}}] = n \cdot \frac{C_{s,\text{Unit}}}{N}\]</span></p>
 <p>Substituting this into the Expected Total Deduction <span class="math inline">\(E[D]\)</span>:</p>
 <p><span class="math display">\[E[D] = \sum_{s} \left[ \frac{C_{s,\text{Inside}} \cdot w_{s,\text{Inside}}}{n} + \frac{C_{s,\text{Outside}} \cdot w_{s,\text{Outside}}}{n} + \frac{C_{s,\text{Unit}} \cdot w_{s,\text{Unit}}}{N} \right]\]</span></p>
-<p><em>Note: The sample size <span class="math inline">\(n\)</span> cancels out for unit defects, shifting the optimization focus to the true building density <span class="math inline">\(C/N\)</span>.</em></p>
 </section>
-<section id="resource-mapping-and-graph-topology" class="level1">
-<h1>4. Resource Mapping and Graph Topology</h1>
-<p>Maintenance tasks are not independent. The sequence of work forms a <strong>Directed Acyclic Graph (DAG)</strong> where each task <span class="math inline">\(i\)</span> is a vertex <span class="math inline">\(V_i\)</span> with an expected execution time <span class="math inline">\(t_i\)</span> and material cost <span class="math inline">\(m_i\)</span>.</p>
+<section id="resource-mapping-and-graph-topology-dag" class="level1">
+<h1>4. Resource Mapping and Graph Topology (DAG)</h1>
+<p>Maintenance tasks form a <strong>Directed Acyclic Graph (DAG)</strong> where each task <span class="math inline">\(i\)</span> is a vertex <span class="math inline">\(V_i\)</span> with an expected execution time <span class="math inline">\(t_i\)</span> and material cost <span class="math inline">\(m_i\)</span>.</p>
 <section id="edge-constraints" class="level2">
 <h2 class="anchored" data-anchor-id="edge-constraints">4.1. Edge Constraints</h2>
 <ol type="1">
 <li><strong>Sequential Precedence:</strong> A directed edge <span class="math inline">\(V_A \to V_B\)</span> requires the start time of <span class="math inline">\(B\)</span> to be <span class="math inline">\(\ge\)</span> the end time of <span class="math inline">\(A\)</span>.</li>
-<li><strong>Temporal Blocking:</strong> Certain vertices (e.g., <span class="math inline">\(V_{glaze}\)</span>) impose a local resource freeze, locking a spatial node (e.g., the bathroom) for a time interval <span class="math inline">\(\Delta t\)</span>.</li>
-<li><strong>Mutually Exclusive Pruning:</strong> If a higher-order vertex <span class="math inline">\(V_{replace}\)</span> is activated, redundant child vertices <span class="math inline">\(V_{repair}\)</span> are pruned from the DAG (<span class="math inline">\(t_{repair} \to 0\)</span>).</li>
+<li><strong>Temporal Blocking:</strong> Certain vertices impose a local resource freeze, locking a spatial node for a time interval <span class="math inline">\(\Delta t\)</span>.</li>
+<li><strong>Mutually Exclusive Pruning:</strong> If a higher-order vertex <span class="math inline">\(V_{replace}\)</span> is activated, redundant child vertices <span class="math inline">\(V_{repair}\)</span> are pruned (<span class="math inline">\(t_{repair} \to 0\)</span>).</li>
 </ol>
 </section>
-<section id="stochastic-triggers-monte-carlo-parameters" class="level2">
-<h2 class="anchored" data-anchor-id="stochastic-triggers-monte-carlo-parameters">4.2. Stochastic Triggers (Monte Carlo Parameters)</h2>
-<p>Because expected values commute but operational maximums do not, the network is evaluated via Monte Carlo simulation to capture “fat tail” risks.</p>
+</section>
+<section id="task-modalities-execution-constraints" class="level1">
+<h1>5. Task Modalities &amp; Execution Constraints</h1>
+<p>Task execution times are not normally distributed; they represent distinct physical realities (e.g., a quick adjustment versus a catastrophic replacement).</p>
+<section id="mixture-distributions-pert" class="level2">
+<h2 class="anchored" data-anchor-id="mixture-distributions-pert">5.1. Mixture Distributions (PERT)</h2>
+<p>Task <span class="math inline">\(i\)</span> exists in state <span class="math inline">\(k \in \{1, 2, 3\}\)</span>. The execution time <span class="math inline">\(t_i\)</span> is drawn from a bounded Beta-PERT distribution, weighted by the physical probability of the state (<span class="math inline">\(p_{i,k}\)</span>):</p>
+<p><span class="math display">\[f(t_i) = \sum_{k} p_{i,k} \cdot \text{PERT}(t; a_k, m_k, b_k)\]</span> where <span class="math inline">\(a_k, m_k, b_k\)</span> represent the optimistic, mode, and pessimistic completion times.</p>
+</section>
+<section id="vendor-handoff-nodes" class="level2">
+<h2 class="anchored" data-anchor-id="vendor-handoff-nodes">5.2. Vendor Handoff Nodes</h2>
+<p>If a task evaluates to a severe state requiring external licensing or specialization (e.g., licensed plumbing or glazing), the node logic bifurcates: * Internal labor time drops to zero (<span class="math inline">\(t_{internal} \to 0\)</span>). * A schedule lag is injected, drawing from a Uniform distribution: <span class="math inline">\(L \sim \text{Uniform}(l_{min}, l_{max})\)</span> days. * A mandatory spatial lockout is triggered (e.g., 24-hour cure time for silicone), forcing the DAG to re-route internal technicians.</p>
+</section>
+</section>
+<section id="quality-control-redundancy" class="level1">
+<h1>6. Quality Control &amp; Redundancy</h1>
+<p>Execution of a task does not guarantee absolute resolution. A task has a baseline probability (<span class="math inline">\(p_{err}\)</span>) of being missed or improperly repaired.</p>
 <ul>
-<li><strong>Binary Access Shocks:</strong> <span class="math inline">\(B_{access} \sim \text{Bernoulli}(p_{deny})\)</span>. If triggered, the unit sub-graph is delayed by 24 hours.</li>
-<li><strong>Branching Spawns:</strong> <span class="math inline">\(B_{rot} \sim \text{Bernoulli}(p_{rot})\)</span>. Execution of <span class="math inline">\(V_i\)</span> has a probability of dynamically spawning a mandatory child vertex <span class="math inline">\(V_{hidden\_damage}\)</span> into the DAG.</li>
-<li><strong>Execution Variance:</strong> <span class="math inline">\(t_i\)</span> follows a specified distribution (e.g., PERT or Log-Normal) to simulate realistic operational friction.</li>
+<li><strong>Serial Execution (Single Technician):</strong> The probability of a defect surviving into the inspection phase is <span class="math inline">\(P(\text{Survive}) = p_{err}\)</span>.</li>
+<li><strong>Parallel Execution (Dual Technicians):</strong> Applying the “Four Eyes” principle, independent cross-checking drastically reduces error. The joint probability of both technicians missing the defect becomes <span class="math inline">\(P(\text{Survive}) = p_{err}^2\)</span>.</li>
 </ul>
+<p>Surviving defects directly populate the observed defect count <span class="math inline">\(c_{s,l}\)</span> in the NSPIRE scoring function.</p>
+</section>
+<section id="predictive-topological-risk-latent-covariates" class="level1">
+<h1>7. Predictive Topological Risk (Latent Covariates)</h1>
+<p>Baseline task probabilities assume a standard asset deterioration rate. However, lack of historical tenant reporting indicates hidden deferred maintenance, warping the DAG’s risk topology.</p>
+<p>Let <span class="math inline">\(W_u\)</span> be the count of historical service requests for unit <span class="math inline">\(u\)</span>. The Unit Risk Multiplier <span class="math inline">\(R_u \in (0, 1]\)</span> follows an exponential decay function:</p>
+<p><span class="math display">\[R_u = e^{-\lambda W_u}\]</span></p>
+<p>Where <span class="math inline">\(\lambda\)</span> is a tuning parameter. For units with low reporting (<span class="math inline">\(W_u \to 0\)</span>, <span class="math inline">\(R_u \to 1\)</span>), probability mass is dynamically shifted from the nominal state (<span class="math inline">\(p_1\)</span>) to the catastrophic/vendor state (<span class="math inline">\(p_3\)</span>) bounded by a maximum shift factor <span class="math inline">\(\Delta_{max}\)</span>:</p>
+<p><span class="math display">\[p_3^* = p_3 + (R_u \cdot \Delta_{max})\]</span> <span class="math display">\[p_1^* = \max(0, p_1 - (R_u \cdot \Delta_{max}))\]</span></p>
+<p>This transforms the engine from a purely stochastic simulator into a predictive prioritization tool for pre-inspection targeting.</p>
+<div class="cell">
+<div id="tbl-tasks-config" class="cell quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-tbl figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-tbl" id="tbl-tasks-config-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Table&nbsp;1: NSPIRE Task Modalities and Execution Constraints
+</figcaption>
+<div aria-describedby="tbl-tasks-config-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<div class="cell-output-display">
+<div class="datatables html-widget html-fill-item" id="htmlwidget-0eaa36c1748de88ae997" style="width:100%;height:auto;"></div>
+<script type="application/json" data-for="htmlwidget-0eaa36c1748de88ae997">{"x":{"filter":"none","vertical":false,"extensions":["FixedColumns","Responsive"],"data":[["1","2","3","4","5","6","7","8","9","10","11","12","13","14","15","16","17","18","19","20","21","22","23","24","25","26","27","28","29","30","31","32"],["FS-01","FS-02","FS-03","FS-04","FS-05","EL-01","EL-02","EL-03","EL-04","PL-01","PL-02","PL-03","PL-04","PL-05","PL-06","PL-07","VA-01","VA-02","VA-03","VA-04","VA-05","DW-01","DW-02","DW-03","DW-04","DW-05","DW-06","SU-01","SU-02","SU-03","SU-04","SU-05"],["FS","FS","FS","FS","FS","EL","EL","EL","EL","PL","PL","PL","PL","PL","PL","PL","VA","VA","VA","VA","VA","DW","DW","DW","DW","DW","DW","SU","SU","SU","SU","SU"],["LT","LT","LT","LT","LT","LT","LT","STD","STD","STD","STD","STD","STD","S","STD","STD","STD","STD","STD","STD","STD","STD","STD","STD","STD","STD","STD","STD","STD","STD","LT","STD"],["Smoke Detector","Carbon Monoxide Detector","Unit Fire Door Closer","Unit Fire Door Fit/Latch","Egress Window","GFCI Receptacles","Breaker Box","Wall Plates &amp; Covers","Light Fixtures","Kitchen Faucet","Bathroom Faucet","Sink Drains / P-Traps","Garbage Disposal","Toilet Base / Stability","Toilet Tank","Shower/Tub Hardware","Bathroom Exhaust Fan","Kitchen Range Hood","Oven / Stove Range","Refrigerator","Thermostat","Interior Doors","Kitchen Cabinets","Bathroom Vanity","Window Screens","Window Blinds &amp; Shades","Balcony / Patio Door","Kitchen Countertop Seams","Bathroom Tub/Sink Seams","Drywall &amp; Plaster","Flooring / Trip Hazards","Wall Stains / Paint"],[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],[0.02,0.02,0.05,0.05,0.1,0.05,0.02,0.15,0.05,0.05,0.05,0.1,0.05,0.05,0.05,0.05,0.1,0.05,0.05,0.05,0.05,0.1,0.1,0.05,0.15,0.05,0.1,0.1,0.1,0.15,0.1,0.15],[0.8,0.85,0.75,0.7,0.8,0.85,0.9,0.95,0.7,0.6,0.6,0.6,0.75,0.6,0.5,0.7,0.7,0.85,0.85,0.85,0.8,0.6,0.6,0.6,0.7,1,0.7,0.6,0.6,0.7,0.8,0.75],[5,5,5,5,10,10,5,5,5,5,5,5,5,5,5,5,5,10,5,5,5,5,5,0,5,10,5,10,10,5,5,10],[10,10,10,10,15,15,10,10,10,10,10,10,10,10,10,10,10,15,10,10,10,15,10,0,10,15,15,15,15,15,15,15],[15,15,20,20,25,25,15,15,15,15,15,15,15,20,15,20,15,20,20,20,15,25,20,0,20,25,30,25,25,30,25,25],[5,5,0,0,5,20,5,2,5,2,2,0,0,5,0,0,0,15,35,0,0,0,0,0,10,30,0,5,5,5,5,5],[0.2,0.15,0.25,0.25,0.2,0.15,0.1,0.05,0.3,0.4,0.4,0.35,0.25,0.3,0.5,0.3,0.2,0.15,0.15,0.15,0.2,0.4,0.3,0.3,0.3,0,0.3,0.3,0.3,0.3,0.2,0.25],[10,10,15,15,30,30,0,10,20,30,30,15,30,30,15,20,15,40,45,45,15,15,20,15,10,0,20,30,30,45,30,30],[15,15,25,30,60,60,0,15,35,45,45,25,45,45,25,40,20,60,60,60,25,30,35,25,15,0,40,45,45,90,60,45],[25,25,40,45,90,90,0,25,50,75,75,45,60,75,40,60,35,90,90,90,40,45,50,40,25,0,60,60,60,150,120,75],[25,35,65,150,120,30,250,5,45,85,65,15,110,10,20,45,45,150,650,750,45,25,45,15,35,0,85,15,15,25,45,15],[false,false,false,false,false,false,true,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false],[0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,24,0,4],[0,0,0,0.05,0,0,0,0,0,0,0,0.05,0,0.1,0,0,0.1,0,0,0,0,0,0.1,0.1,0,0,0,0.1,0.1,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,90,0,0,60,0,0,0,0,0,60,90,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,150,0,0,90,0,0,0,0,0,90,150,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,240,0,0,120,0,0,0,0,0,150,240,0,0,0,0,0,0,0,0],[0,0,0,800,0,0,0,0,0,0,0,250,0,150,0,0,95,0,0,0,0,0,250,350,0,0,0,300,400,0,0,0],[false,false,false,true,false,false,false,false,false,false,false,true,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,true,true,false,false,false],[0,0,0,7,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,2,0,0,0],[0,0,0,21,0,0,0,0,0,0,0,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,7,7,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,24,24,0,0,0]],"container":"<table class=\"cell-border stripe hover\">\n  <thead>\n    <tr>\n      <th> <\/th>\n      <th>task_id<\/th>\n      <th>category<\/th>\n      <th>severity<\/th>\n      <th>description<\/th>\n      <th>prerequisites<\/th>\n      <th>p_miss_base<\/th>\n      <th>p1<\/th>\n      <th>t1_a<\/th>\n      <th>t1_m<\/th>\n      <th>t1_b<\/th>\n      <th>cost1<\/th>\n      <th>p2<\/th>\n      <th>t2_a<\/th>\n      <th>t2_m<\/th>\n      <th>t2_b<\/th>\n      <th>cost2<\/th>\n      <th>vendor2_flag<\/th>\n      <th>lag2_min<\/th>\n      <th>lag2_max<\/th>\n      <th>lockout2_hrs<\/th>\n      <th>p3<\/th>\n      <th>t3_a<\/th>\n      <th>t3_m<\/th>\n      <th>t3_b<\/th>\n      <th>cost3<\/th>\n      <th>vendor3_flag<\/th>\n      <th>lag3_min<\/th>\n      <th>lag3_max<\/th>\n      <th>lockout3_hrs<\/th>\n    <\/tr>\n  <\/thead>\n<\/table>","options":{"pageLength":10,"scrollX":true,"fixedColumns":{"leftColumns":5},"autoWidth":true,"columnDefs":[{"className":"dt-center","targets":"_all"},{"orderable":false,"targets":0},{"name":" ","targets":0},{"name":"task_id","targets":1},{"name":"category","targets":2},{"name":"severity","targets":3},{"name":"description","targets":4},{"name":"prerequisites","targets":5},{"name":"p_miss_base","targets":6},{"name":"p1","targets":7},{"name":"t1_a","targets":8},{"name":"t1_m","targets":9},{"name":"t1_b","targets":10},{"name":"cost1","targets":11},{"name":"p2","targets":12},{"name":"t2_a","targets":13},{"name":"t2_m","targets":14},{"name":"t2_b","targets":15},{"name":"cost2","targets":16},{"name":"vendor2_flag","targets":17},{"name":"lag2_min","targets":18},{"name":"lag2_max","targets":19},{"name":"lockout2_hrs","targets":20},{"name":"p3","targets":21},{"name":"t3_a","targets":22},{"name":"t3_m","targets":23},{"name":"t3_b","targets":24},{"name":"cost3","targets":25},{"name":"vendor3_flag","targets":26},{"name":"lag3_min","targets":27},{"name":"lag3_max","targets":28},{"name":"lockout3_hrs","targets":29}],"order":[],"orderClasses":false,"responsive":true}},"evals":[],"jsHooks":[]}</script>
+</div>
+</div>
+</figure>
+</div>
+</div>
 <hr>
 <style>
 .floating-copyright {
@@ -208,14 +264,13 @@ window.Quarto = {
   padding: 5px 10px;
   border-radius: 5px;
   z-index: 1000;
-  pointer-events: none; /* Ensures the text doesn't block your mouse from clicking things behind it */
+  pointer-events: none; 
 }
 </style>
 <div class="floating-copyright">
 <p>© 2026 Joël R. Pradines.<br> All rights reserved.</p>
 </div>
 
-</section>
 </section>
 
 </main>

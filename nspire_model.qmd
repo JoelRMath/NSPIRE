@@ -9,6 +9,7 @@ format:
     toc-location: left
     theme: cosmo
     math: true
+    embed-resources: true
 ---
 
 # 1. Introduction

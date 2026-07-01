@@ -1,0 +1,7 @@
+rubric_name,severity,deduction
+NSPIRE,LT,5.0
+NSPIRE,S,2.0
+NSPIRE,STD,1.0
+UPCS,LT,3.0
+UPCS,S,1.5
+UPCS,STD,0.5

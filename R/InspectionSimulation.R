@@ -1,32 +1,51 @@
-library(yaml)
-
-# Note: Assuming InspectionDAG.R is sourced prior to running this, 
-# or they are bundled in the same package environment.
-# source("InspectionDAG.R")
-
 # ==========================================
 # 1. The Simulation Environment Class Definition
 # ==========================================
+
+#' InspectionSimulation Class
+#'
+#' An S4 class representing the complete environment for an NSPIRE Monte Carlo simulation.
+#'
+#' @slot dag An object of class \code{InspectionDAG} representing the task dependencies.
+#' @slot floorplans A \code{data.frame} containing the physical item counts per unit archetype.
+#' @slot scenario A \code{list} containing the parsed YAML operational strategy parameters.
+#' @slot building_mix A \code{numeric} vector of normalized probabilities for unit archetypes.
+#' @export
 setClass(
   "InspectionSimulation",
   slots = list(
     dag          = "InspectionDAG", # The mathematical graph
     floorplans   = "data.frame",    # Unit spatial configurations
     scenario     = "list",          # Parsed YAML strategy parameters
-    building_mix = "numeric"        # Normalized probabilities for unit archetypes
+    building_mix = "numeric",       # Normalized probabilities for unit archetypes
+    topo_nodes   = "character",     # Cached topological sort
+    long_floorplans = "data.frame"  # Cached long-format physical items
   )
 )
 
 # ==========================================
 # 2. The Constructor Function
 # ==========================================
+
+#' Create a Simulation Environment
+#'
+#' Validates and constructs an \code{InspectionSimulation} object from raw configuration files.
+#'
+#' @param dag_csv Path to the tasks configuration CSV file.
+#' @param floorplan_csv Path to the floorplans configuration CSV file.
+#' @param yaml_path Path to the scenario configuration YAML file.
+#' @param mix_weights A named numeric vector representing the distribution of unit types.
+#' 
+#' @return An object of class \code{InspectionSimulation}.
+#' @importFrom methods new
+#' @export
 create_simulation_env <- function(dag_csv, floorplan_csv, yaml_path, mix_weights) {
   
   # 1. Instantiate the mathematical DAG
   my_dag <- create_inspection_dag(dag_csv)
   
   # 2. Load the physical floorplan item counts
-  fp_df <- read.csv(floorplan_csv, stringsAsFactors = FALSE, strip.white = TRUE)
+  fp_df <- read.csv(floorplan_csv, stringsAsFactors = FALSE, strip.white = TRUE, check.names = FALSE)
   
   # Validate that the DAG and Floorplans match
   missing_tasks <- setdiff(my_dag@tasks_config$task_id, fp_df$task_id)
@@ -34,6 +53,22 @@ create_simulation_env <- function(dag_csv, floorplan_csv, yaml_path, mix_weights
     stop("CRITICAL ERROR: Tasks in DAG are missing from floorplans_config.csv: ", 
          paste(missing_tasks, collapse = ", "))
   }
+  
+  # Pre-calculate Topological Sort
+  topo_nodes <- names(igraph::topo_sort(my_dag@graph))
+  
+  # Pre-shape Floorplans to long format
+  archetypes <- names(mix_weights)
+  long_fp_list <- lapply(archetypes, function(arch) {
+    data.frame(
+      unit_type = arch,
+      task_id = fp_df$task_id,
+      item_count = fp_df[[arch]],
+      stringsAsFactors = FALSE
+    )
+  })
+  long_fp <- do.call(rbind, long_fp_list)
+  long_fp <- long_fp[long_fp$item_count > 0, ]
   
   # 3. Load the operational strategy YAML
   if (!file.exists(yaml_path)) {
@@ -52,12 +87,22 @@ create_simulation_env <- function(dag_csv, floorplan_csv, yaml_path, mix_weights
       dag          = my_dag,
       floorplans   = fp_df,
       scenario     = scenario_config,
-      building_mix = mix_weights)
+      building_mix = mix_weights,
+      topo_nodes   = topo_nodes,
+      long_floorplans = long_fp)
 }
 
 # ==========================================
 # 3. The Custom Show Method (Console Dashboard)
 # ==========================================
+
+#' Show method for InspectionSimulation
+#' 
+#' Prints a clean dashboard summary of the simulation environment parameters.
+#' 
+#' @param object An \code{InspectionSimulation} object.
+#' @importFrom methods show
+#' @exportMethod show
 setMethod("show", "InspectionSimulation", function(object) {
   scen <- object@scenario
   

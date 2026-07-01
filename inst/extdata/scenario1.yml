@@ -1,0 +1,25 @@
+scenario_name: "The Balanced Strategy (30-Day Window)"
+description: "Starts prep 1 month out, utilizing 2-tech teams with mild synergy."
+
+staffing:
+  techs_per_unit: 2
+  efficiency_multiplier: 1.10         # 10% speed bonus for teamwork
+  hourly_rate_internal: 45.00
+  overtime_multiplier: 1.50
+  max_overtime_hours_per_unit: 8      # Hard cap on OT spending per unit
+
+temporal_strategy:
+  days_before_inspection: 30          # When the prep cycle begins
+  regular_capacity_hours_per_unit: 10 # Allocated regular hours before OT triggers
+  historical_tickets_lambda: 4.5      # Building average annual tickets per unit
+
+workflow:
+  audit_catch_rate: 0.85              # Probability of catching vendor parts during walk
+  audit_time_mins: 15                 # Labor time spent on the pre-inspection walk
+  category_priority:                  # Tie-breaker for parallel scheduling
+    - "SU"
+    - "PL"
+    - "EL"
+    - "VA"
+    - "FS"
+    - "DW"

@@ -24,15 +24,15 @@ The inspection divides a property into distinct locations and evaluates defects 
 * **Severity:** $s \in \{\text{LT}, \text{S}, \text{STD}\}$ (Life-Threatening, Severe, Standard)
 * **Location:** $l \in \{\text{Unit}, \text{Inside}, \text{Outside}\}$
 * $N$: Total number of units in the property.
-* $n$: Number of units inspected.
+* $n(N)$: The HUD-mandated sample size function, where $n$ is a discrete function of $N$.
 * $C_{s,l}$: True total count of defects existing in the property.
 * $c_{s,l}$: Observed count of defects recorded during the inspection.
 * $w_{s,l}$: Static point weight (penalty) assigned to a defect.
 
 ## 2.2. The Deduction Function
-The total point deduction $D$ is a summation over all severities and locations, normalized by the sample size:
+The total point deduction $D$ is a summation over all severities and locations. For Unit locations, the observed defects are normalized by the sample size $n(N)$, which effectively scales the deduction based on the inspection tier:
 
-$$D = \sum_{s \in \{\text{LT}, \text{S}, \text{STD}\}} \sum_{l \in \{\text{Unit}, \text{Inside}, \text{Outside}\}} \left( \frac{c_{s,l}}{n} \cdot w_{s,l} \right)$$
+$$D = \sum_{s} \sum_{l \in \{\text{Inside}, \text{Outside}\}} (c_{s,l} \cdot w_{s,l}) + \sum_{s} \left( \frac{c_{s,\text{Unit}}}{n(N)} \cdot w_{s,\text{Unit}} \right)$$
 
 ## 2.3. The Raw Continuous Score
 The base score originates at 100 and is bounded at zero using the Heaviside step function $H(x)$:
@@ -46,16 +46,44 @@ $$n_{LT} = \sum_{l} c_{\text{LT},l}$$
 
 $$S_{eff} = S_{raw} \cdot H(0.5 - n_{LT})$$
 
-# 3. Probabilistic Sampling and Expected Deductions
+# 3. Probabilistic Sampling and Realizations
 
-Unit defects are sampled without replacement from $N$. Thus, $c_{s,\text{Unit}}$ follows a hypergeometric distribution.
+The inspection score is not a deterministic value but a random variable $S(\omega)$ dependent on the state $\omega$ (the realization of all random variables). 
 
-The **Expected Value** of observed unit defects is:
-$$E[c_{s,\text{Unit}}] = n \cdot \frac{C_{s,\text{Unit}}}{N}$$
+## 3.1. Stochastic Unit Sampling
+HUD inspection protocols dictate that units are sampled without replacement. For a property with $N$ total units, the inspector chooses a subset $n(N)$ based on the tiered sampling schedule defined in Table 1.
 
-Substituting this into the Expected Total Deduction $E[D]$:
+| Total Units ($N$) | Inspected Units ($n$) |
+| :--- | :--- |
+| 1–5 | All units |
+| 6–7 | 6 |
+| 8 | 7 |
+| 9–10 | 8 |
+| 11–12 | 9 |
+| 13–14 | 10 |
+| 15–16 | 11 |
+| 17–18 | 12 |
+| 19–21 | 13 |
+| 22–24 | 14 |
+| 25–27 | 15 |
+| 28–30 | 16 |
+| 31–35 | 17 |
+| 36–39 | 18 |
+| 40–45 | 19 |
+| 46–51 | 20 |
+| 52–59 | 21 |
+| 60–67 | 22 |
+| 68–78 | 23 |
+| 79–92 | 24 |
+| 93–110 | 25 |
+| 111+ | 32 |
 
-$$E[D] = \sum_{s} \left[ \frac{C_{s,\text{Inside}} \cdot w_{s,\text{Inside}}}{n} + \frac{C_{s,\text{Outside}} \cdot w_{s,\text{Outside}}}{n} + \frac{C_{s,\text{Unit}} \cdot w_{s,\text{Unit}}}{N} \right]$$
+## 3.2. Realization of Deductions
+Let $I_{u}$ be an indicator variable where $I_u = 1$ if unit $u$ is selected for inspection, and $0$ otherwise. The observed defect count $c_{s,\text{Unit}}$ for a specific simulation realization $\omega$ is defined by the subset of selected units:
+
+$$c_{s,\text{Unit}}(\omega) = \sum_{u=1}^{N} I_u(\omega) \cdot \mathbb{1}(\text{unit } u \text{ has defect } s)$$
+
+Unlike an expected value approach, our model calculates the realization $D(\omega)$ for each iteration $k$ in the Monte Carlo ensemble. This preserves the variance inherent in the sampling process, which is the primary driver of the "lottery effect" in mid-sized properties.
 
 # 4. Resource Mapping and Graph Topology (DAG)
 
@@ -91,22 +119,54 @@ Execution of a task does not guarantee absolute resolution. A task has a baselin
 
 Surviving defects directly populate the observed defect count $c_{s,l}$ in the NSPIRE scoring function.
 
-# 7. Predictive Topological Risk (Latent Covariates)
+# 7. Temporal Windowing and Asset Decay
 
-Baseline task probabilities assume a standard asset deterioration rate. However, lack of historical tenant reporting indicates hidden deferred maintenance, warping the DAG's risk topology.
+The operational model assumes a maintenance repair window defined by $t_{start}$ (commencement of internal repairs) and $t_{end}$ (completion of repairs/audit). The interval $\delta = t_{start} - t_{end}$ constrains the total available labor capacity, while the subsequent interval $\delta_{decay} = t_{inspection} - t_{end}$ dictates the post-repair asset degradation.
 
-Let $W_u$ be the count of historical service requests for unit $u$. The Unit Risk Multiplier $R_u \in (0, 1]$ follows an exponential decay function:
+## 7.1. Repair Capacity
+Given a standard base labor capacity $R_{base}$ (hours/unit/day), the total labor capacity $\text{Cap}$ available for the maintenance cycle is linearly proportional to the duration of the repair window:
 
-$$R_u = e^{-\lambda W_u}$$
+$$\text{Cap} = R_{base} \cdot (t_{start} - t_{end})$$
 
-Where $\lambda$ is a tuning parameter. For units with low reporting ($W_u \to 0$, $R_u \to 1$), probability mass is dynamically shifted from the nominal state ($p_1$) to the catastrophic/vendor state ($p_3$) bounded by a maximum shift factor $\Delta_{max}$:
+Tasks requiring labor hours $T_{total} > \text{Cap}$ result in a scheduling backlog, forcing the prioritization of high-penalty items (LT/S) at the expense of lower-severity items.
 
-$$p_3^* = p_3 + (R_u \cdot \Delta_{max})$$
-$$p_1^* = \max(0, p_1 - (R_u \cdot \Delta_{max}))$$
+## 7.2. Tenant Heterogeneity (Bimodal Risk)
+Asset deterioration is not uniform across a property. We model unit "cleanliness" as a bimodal latent state $\phi_u$ for each unit $u$, representing the inherent maintenance burden generated by the tenant. The tenant impact multiplier $\phi_u$ is drawn from a mixture distribution:
 
-This transforms the engine from a purely stochastic simulator into a predictive prioritization tool for pre-inspection targeting.
+$$\phi_u \sim \begin{cases} \phi_{clean}, & \text{with probability } (1 - \pi) \\ \phi_{dirty}, & \text{with probability } \pi \end{cases}$$
 
+Where $\pi$ is the estimated proportion of high-impact units in the property.
 
+## 7.3. Post-Audit Asset Decay
+Once repairs are audited at $t_{end}$, the asset re-enters a state of stochastic wear. We model the defect re-emergence as a Bernoulli process over the decay window $\delta_{decay}$. 
+
+Given a daily probability of failure $\lambda_{i}$ for task $i$, the probability $P_{redefect}$ that a resolved task fails before the inspection date is:
+
+$$P_{redefect} = 1 - (1 - \lambda_{i,u}^*)^{\delta_{decay}}$$
+
+The effective daily probability of failure $\lambda_{i,u}^*$ is coupled with the unit's latent state $\phi_u$, effectively accelerating the re-emergence of defects in high-impact ("dirty") units:
+
+$$\lambda_{i,u}^* = \lambda_{i} \cdot \phi_u$$
+
+This temporal decay creates a trade-off: an earlier $t_{end}$ increases the decay window, inflating the probability that fixed items will fail before the inspector arrives, while a late $t_{end}$ constricts the repair window, potentially inducing a labor backlog.
+
+# 8. Predictive Topological Risk (Latent Covariates)
+
+Baseline task probabilities assume a standard asset deterioration rate. However, the lack of historical tenant reporting often masks hidden deferred maintenance, warping the DAG's risk topology. We use historical service request volume $W_u$ as a proxy to estimate the probability that a unit belongs to the "dirty" latent state ($\phi_{dirty}$).
+
+## 8.1. Inferring Latent States
+We define the unit-specific probability $\pi_u$ of a unit being in the high-impact state as a logistic function of service requests $W_u$:
+
+$$\pi_u = P(\phi_u = \phi_{dirty} | W_u) = \text{logit}^{-1}(\alpha - \beta W_u)$$
+
+Where $\alpha$ and $\beta$ are calibrated tuning parameters. For units with low reporting ($W_u \to 0$), the prior probability of being in the "dirty" state increases, signaling a higher likelihood of latent deferred maintenance.
+
+## 8.2. Dynamic Risk Mapping
+This unit-specific $\pi_u$ dynamically replaces the global mixture probability used in Section 7.2. During simulation initialization, each unit's tenant factor $\phi_u$ is sampled conditioned on its specific reporting history:
+
+$$\phi_u \sim \begin{cases} \phi_{clean}, & \text{with probability } (1 - \pi_u) \\ \phi_{dirty}, & \text{with probability } \pi_u \end{cases}$$
+
+This approach transforms the simulation from a static property model into a predictive prioritization tool. By mapping historical service request volumes to the bimodal risk topology, the engine directs the maintenance DAG to prioritize units where $W_u$ is low (indicating a high probability of "hidden" defects) before they enter the randomized HUD sampling window.
 
 ```{r}
 #| label: tbl-tasks-config
@@ -120,7 +180,7 @@ library(DT)
 library(readr)
 
 # Read the CSV
-tasks_df <- read_csv("tasks_config.csv")
+tasks_df <- read_csv("../inst/extdata/tasks_config.csv")
 
 # Generate and print the interactive table
 datatable(
@@ -138,6 +198,33 @@ datatable(
   class = 'cell-border stripe hover'
 )
 ```
+
+# 9. Risk Analysis
+
+Moving beyond deterministic score projections, this model quantifies operational risk by treating property performance as a stochastic process. By leveraging Monte Carlo simulation, we assess not only the expected outcome but the probability of regulatory non-compliance.
+
+## 9.1. Quantification of Failure Risk
+
+We define the failure event as $S_{eff} < 60$. Due to the non-linear interaction of random unit sampling, defect emergence probabilities, and repair quality, the inspection score $S_{eff}$ is a random variable. We estimate the probability of failure ($P_{fail}$) by simulating $K = 1,000$ independent inspection realizations:
+
+$$P_{fail} = \frac{1}{K} \sum_{i=1}^{K} I(S_{eff,i} < 60)$$
+
+where $I(\cdot)$ is the indicator function. This allows us to map the property's risk profile against the HUD enforcement threshold, providing a granular view of the likelihood of catastrophic failure that a mean-based score effectively masks.
+
+## 9.2. Quantifying Volatility: The Tail Drop Metric
+
+Standard deviation ($\sigma$) and the Coefficient of Variation ($CV = \sigma/\mu$) provide a global measure of dispersion. However, in NSPIRE compliance, the right tail (scores $> 100$) is truncated, and the distribution is often skewed. The primary operational risk resides in the left tail—the possibility of a "bad day" where sampling captures a cluster of high-severity defects.
+
+To quantify this downside volatility, we define the **Tail Drop Metric** ($\tau$):
+
+$$\tau = \frac{\mu - P_{05}}{\mu}$$
+
+Where:
+*   $\mu$ is the expected mean effective score.
+*   $P_{05}$ is the 5th percentile of the simulated scores (the "Value at Risk").
+
+$\tau$ represents the percentage degradation from expected performance to the worst-case scenario. A property may exhibit a high $\mu$ while maintaining a high $\tau$, identifying it as a "lottery" asset—stable on average, but highly susceptible to non-linear drops in score due to the interaction of unit sampling variance and tenant-driven decay.
+
 ---
 
 <style>

@@ -4,171 +4,126 @@
 
 #' Beta-PERT Random Number Generator (Vectorized)
 #' 
-#' Generates a random value from a PERT distribution. Fully vectorized to handle
-#' vectors for min, mode, and max parameters simultaneously.
-#' 
 #' @param n Integer. Number of observations.
-#' @param a Numeric vector. Minimum (optimistic) values.
-#' @param m Numeric vector. Most likely (mode) values.
-#' @param b Numeric vector. Maximum (pessimistic) values.
-#' @return A numeric vector of length n.
+#' @param a Numeric vector. Minimum values.
+#' @param m Numeric vector. Mode values.
+#' @param b Numeric vector. Maximum values.
+#' @return A numeric vector.
 #' @importFrom stats rbeta
 #' @export
 rpert <- function(n, a, m, b) {
   res <- numeric(n)
-  
-  # Identify items that have no variance (fixed time)
   fixed_idx <- (a == b)
-  if (any(fixed_idx)) {
-    res[fixed_idx] <- a[fixed_idx]
-  }
+  if (any(fixed_idx)) res[fixed_idx] <- a[fixed_idx]
   
-  # Calculate Beta distribution for items with variance
   var_idx <- !fixed_idx
   if (any(var_idx)) {
-    a_v <- a[var_idx]
-    m_v <- m[var_idx]
-    b_v <- b[var_idx]
-    
+    a_v <- a[var_idx]; m_v <- m[var_idx]; b_v <- b[var_idx]
     alpha <- 1 + 4 * ((m_v - a_v) / (b_v - a_v))
     beta_param  <- 1 + 4 * ((b_v - m_v) / (b_v - a_v))
-    
     res[var_idx] <- a_v + stats::rbeta(sum(var_idx), alpha, beta_param) * (b_v - a_v)
   }
-  
   return(res)
 }
 
 #' Generate Building Demographics
-#' 
-#' Spawns a physical building profile by sampling unit archetypes based on the 
-#' specified building mix probabilities.
-#' 
-#' @param sim_env An \code{InspectionSimulation} object.
-#' @param total_units Integer. The total number of units in the building.
-#' @return A character vector of length \code{total_units} containing the assigned archetypes.
 #' @export
 generate_building <- function(sim_env, total_units) {
   archetypes <- names(sim_env@building_mix)
   probs <- as.numeric(sim_env@building_mix)
-  
   sample(x = archetypes, size = total_units, replace = TRUE, prob = probs)
 }
 
-#' Run NSPIRE Inspection Simulation (Vectorized)
-#' 
-#' Executes a single Monte Carlo pass using high-performance relational merges.
-#' 
-#' @param sim_env An \code{InspectionSimulation} object.
-#' @param total_units Integer. Number of units in the building (default: 100).
-#' @param seed Integer. Optional random seed for reproducible results.
-#' 
-#' @return A \code{data.frame} containing the master list of generated defects.
-#' @importFrom stats runif
+#' Run NSPIRE Inspection Simulation
 #' @export
 run_simulation <- function(sim_env, total_units = 100, seed = NULL) {
   if (!is.null(seed)) set.seed(seed)
   
-  # 1. Spawn Building
   building_units <- generate_building(sim_env, total_units)
+  scen <- sim_env@scenario
+  
+  clean_prop <- scen$tenant_factors$clean_proportion %||% 0.80
+  clean_mean <- scen$tenant_factors$clean_multiplier_mean %||% 1.0
+  dirty_mean <- scen$tenant_factors$dirty_multiplier_mean %||% 3.0
+  
+  is_clean <- stats::runif(total_units) <= clean_prop
+  tenant_factors <- numeric(total_units)
+  
+  if(any(is_clean)) tenant_factors[is_clean] <- pmax(0.1, stats::rnorm(sum(is_clean), mean = clean_mean, sd = 0.2))
+  if(any(!is_clean)) tenant_factors[!is_clean] <- pmax(1.0, stats::rnorm(sum(!is_clean), mean = dirty_mean, sd = 0.5))
+  
   units_df <- data.frame(
     unit_id = paste0("Unit_", seq_along(building_units)),
     unit_type = building_units,
+    tenant_factor = tenant_factors, 
     stringsAsFactors = FALSE
   )
   
-  # 2. Fetch Cached Long Floorplans (No more reshaping inside the loop!)
   long_fp <- sim_env@long_floorplans
-  
-  # 3. Create Master Inventory of EVERY physical item in the building
   master <- merge(units_df, long_fp, by = "unit_type", all.x = TRUE)
-  
-  # Expand rows based on item_count (e.g., 3 smoke detectors = 3 rows)
   master <- master[rep(seq_len(nrow(master)), master$item_count), ]
   
-  # Fetch probabilities and parameters from tasks_config
   tasks <- sim_env@dag@tasks_config[, c("task_id", "category", "severity", 
                                         "p_defect", "p_miss_base", "t1_a", "t1_m", "t1_b", "cost1")]
   master <- merge(master, tasks, by = "task_id", all.x = TRUE)
   
-  # 4. Vectorized Simulation Mathematics
-  # Roll 1: Defect Generation
-  is_defective <- stats::runif(nrow(master)) < master$p_defect
+  adjusted_p_defect <- pmin(1.0, master$p_defect * master$tenant_factor)
+  is_defective <- stats::runif(nrow(master)) < adjusted_p_defect
+  
   defects <- master[is_defective, ]
   
   if(nrow(defects) == 0) {
     return(data.frame(unit_id=character(), unit_type=character(), task_id=character(), 
-                      category=character(), severity=character(), is_caught=logical(), 
+                      category=character(), severity=character(), tenant_factor=numeric(),
+                      p_defect=numeric(), is_caught=logical(), 
                       repair_time_mins=numeric(), material_cost=numeric()))
   }
   
-  # Roll 2 & 3: Caught Status and Repair Time
   defects$is_caught <- stats::runif(nrow(defects)) >= defects$p_miss_base
   defects$repair_time_mins <- round(rpert(nrow(defects), defects$t1_a, defects$t1_m, defects$t1_b), 2)
   
-  # Format final results dataframe
   results_df <- data.frame(
-    unit_id = defects$unit_id,
-    unit_type = defects$unit_type,
-    task_id = defects$task_id,
-    category = defects$category,
-    severity = defects$severity,
-    is_caught = defects$is_caught,
-    repair_time_mins = defects$repair_time_mins,
-    material_cost = defects$cost1,
+    unit_id = defects$unit_id, unit_type = defects$unit_type, task_id = defects$task_id,
+    category = defects$category, severity = defects$severity, tenant_factor = defects$tenant_factor,
+    p_defect = defects$p_defect, is_caught = defects$is_caught,
+    repair_time_mins = defects$repair_time_mins, material_cost = defects$cost1,
     stringsAsFactors = FALSE
   )
   
-  # Sort back to logical Unit order
   unit_nums <- as.numeric(gsub("Unit_", "", results_df$unit_id))
   results_df <- results_df[order(unit_nums, results_df$task_id), ]
   rownames(results_df) <- NULL
-  
   return(results_df)
 }
 
-#' Schedule Workforce Repairs (Vectorized)
-#' 
-#' Applies DAG topological sorting to guarantee prerequisite task compliance, 
-#' and calculates labor costs using YAML staffing constraints via high-speed arrays.
-#' 
-#' @param defects_df A \code{data.frame} generated by \code{run_simulation}.
-#' @param sim_env An \code{InspectionSimulation} object.
-#' @return A \code{data.frame} appended with execution sequence and labor costs.
+#' Schedule Workforce Repairs
 #' @export
-schedule_repairs <- function(defects_df, sim_env) {
+schedule_repairs <- function(defects_df, sim_env, t_prep_days = 30) {
   if (nrow(defects_df) == 0) return(defects_df)
   
-  # 1. Use Cached Topological Sort (Calculated once in Constructor)
   topo_nodes <- sim_env@topo_nodes
-  
-  # Create a temporary factor to force sorting by the DAG order
   defects_df$task_factor <- factor(defects_df$task_id, levels = topo_nodes)
   defects_df <- defects_df[order(defects_df$unit_id, defects_df$task_factor), ]
-  defects_df$task_factor <- NULL # Cleanup
+  defects_df$task_factor <- NULL 
   
-  # 2. Extract Staffing Financial Constraints from the YAML
   scen <- sim_env@scenario
-  reg_cap_hrs <- scen$temporal_strategy$regular_capacity_hours_per_unit
-  max_ot_hrs  <- scen$staffing$max_overtime_hours_per_unit
+  reg_cap_hrs <- scen$temporal_strategy$regular_capacity_hours_per_unit * t_prep_days
+  max_ot_hrs  <- scen$staffing$max_overtime_hours_per_unit * t_prep_days
   base_rate   <- scen$staffing$hourly_rate_internal
   ot_rate     <- base_rate * scen$staffing$overtime_multiplier
   
-  # 3. Vectorized Cumulative Clock Calculation (Replaces outer loop)
   defects_df$cumulative_time_mins <- ave(defects_df$repair_time_mins, defects_df$unit_id, FUN = cumsum)
-  
-  # 4. Vectorized Overtime and Cost Logic (Replaces inner loop)
   task_time_hrs <- defects_df$repair_time_mins / 60
   cum_time_hrs <- defects_df$cumulative_time_mins / 60
   time_before_task <- cum_time_hrs - task_time_hrs
   
-  # Calculate portion of the task that falls into regular hours vs overtime
   reg_hours <- pmin(task_time_hrs, pmax(0, reg_cap_hrs - time_before_task))
   ot_hours <- task_time_hrs - reg_hours
   
   defects_df$labor_cost <- round((reg_hours * base_rate) + (ot_hours * ot_rate), 2)
   defects_df$is_overtime <- (ot_hours > 0)
   defects_df$is_backlogged <- (cum_time_hrs > (reg_cap_hrs + max_ot_hrs))
-  
   return(defects_df)
 }
+
+`%||%` <- function(a, b) if (!is.null(a)) a else b

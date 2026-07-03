@@ -23,3 +23,7 @@ workflow:
     - "VA"
     - "FS"
     - "DW"
+tenant_factors:
+  clean_proportion: 0.80
+  clean_multiplier_mean: 1.0
+  dirty_multiplier_mean: 3.0

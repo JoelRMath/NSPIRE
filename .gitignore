@@ -3,4 +3,5 @@
 .RData
 .Ruserdata
 inst/doc
-resuts/sensitivity
+results/sensitivity/audit_rate/
+

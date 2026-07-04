@@ -78,6 +78,8 @@ HUD inspection protocols dictate that units are sampled without replacement. For
 | 93–110 | 25 |
 | 111+ | 32 |
 
+While the law of large numbers smooths score variance in high-$N$ properties, this sampling process introduces non-negligible variance in mid-sized properties. Because the inspector's subset is stochastic, the recorded defect count $c_{s,\text{Unit}}$ deviates from the true property state $C_{s,\text{Unit}}$, contributing to the overall spread of the final score distribution.
+
 ## 3.2. Realization of Deductions
 Let $I_{u}$ be an indicator variable where $I_u = 1$ if unit $u$ is selected for inspection, and $0$ otherwise. The observed defect count $c_{s,\text{Unit}}$ for a specific simulation realization $\omega$ is defined by the subset of selected units:
 
@@ -114,10 +116,15 @@ If a task evaluates to a severe state requiring external licensing or specializa
 
 Execution of a task does not guarantee absolute resolution. A task has a baseline probability ($p_{err}$) of being missed or improperly repaired.
 
-* **Serial Execution (Single Technician):** The probability of a defect surviving into the inspection phase is $P(\text{Survive}) = p_{err}$.
-* **Parallel Execution (Dual Technicians):** Applying the "Four Eyes" principle, independent cross-checking drastically reduces error. The joint probability of both technicians missing the defect becomes $P(\text{Survive}) = p_{err}^2$.
+## 6.1. Audit Efficacy
+We introduce a formal internal audit efficacy parameter, $\alpha_{audit} \in [0, 1]$, representing the probability that the pre-inspection internal team detects and successfully mitigates a defect. 
 
-Surviving defects directly populate the observed defect count $c_{s,l}$ in the NSPIRE scoring function.
+If a defect survives the initial repair attempt (with probability $p_{err}$), the probability that it remains undetected by the audit phase is:
+$$P(\text{Survive}) = (1 - \alpha_{audit}) \cdot p_{err}$$
+
+## 6.2. Technician Redundancy
+* **Serial Execution (Single Technician):** The probability of a defect surviving into the inspection phase follows the logic in 6.1.
+* **Parallel Execution (Dual Technicians):** Applying the "Four Eyes" principle, independent cross-checking drastically reduces error. The joint probability of both technicians missing the defect becomes $P(\text{Survive}) = (1 - \alpha_{audit}) \cdot p_{err}^2$.
 
 # 7. Temporal Windowing and Asset Decay
 
@@ -125,6 +132,7 @@ The operational model assumes a maintenance repair window defined by $t_{start}$
 
 ## 7.1. Repair Capacity
 Given a standard base labor capacity $R_{base}$ (hours/unit/day), the total labor capacity $\text{Cap}$ available for the maintenance cycle is linearly proportional to the duration of the repair window:
+
 
 $$\text{Cap} = R_{base} \cdot (t_{start} - t_{end})$$
 
@@ -162,6 +170,7 @@ $$\pi_u = P(\phi_u = \phi_{dirty} | W_u) = \text{logit}^{-1}(\alpha - \beta W_u)
 Where $\alpha$ and $\beta$ are calibrated tuning parameters. For units with low reporting ($W_u \to 0$), the prior probability of being in the "dirty" state increases, signaling a higher likelihood of latent deferred maintenance.
 
 ## 8.2. Dynamic Risk Mapping
+
 This unit-specific $\pi_u$ dynamically replaces the global mixture probability used in Section 7.2. During simulation initialization, each unit's tenant factor $\phi_u$ is sampled conditioned on its specific reporting history:
 
 $$\phi_u \sim \begin{cases} \phi_{clean}, & \text{with probability } (1 - \pi_u) \\ \phi_{dirty}, & \text{with probability } \pi_u \end{cases}$$
@@ -217,13 +226,21 @@ Standard deviation ($\sigma$) and the Coefficient of Variation ($CV = \sigma/\mu
 
 To quantify this downside volatility, we define the **Tail Drop Metric** ($\tau$):
 
-$$\tau = \frac{\mu - P_{05}}{\mu}$$
+$$\tau = \frac{\mu - Z_{05}}{\mu}$$
 
 Where:
+
 *   $\mu$ is the expected mean effective score.
-*   $P_{05}$ is the 5th percentile of the simulated scores (the "Value at Risk").
+*   $Z_{05}$ is the 5th percentile of the simulated scores (the "Value at Risk").
 
 $\tau$ represents the percentage degradation from expected performance to the worst-case scenario. A property may exhibit a high $\mu$ while maintaining a high $\tau$, identifying it as a "lottery" asset—stable on average, but highly susceptible to non-linear drops in score due to the interaction of unit sampling variance and tenant-driven decay.
+
+## 9.3. Sensitivity Mapping
+
+The Tail Drop Metric $\tau$ is a systemic output of our model, functionally defined by the interaction of our control and stochastic parameters:
+$$\tau = f(n(N), \alpha_{audit}, \pi, \phi_{dirty})$$
+
+This sensitivity function captures how variance in the HUD sampling tier $n(N)$, human error in pre-inspection audit ($\alpha_{audit}$), and the underlying distribution of tenant impact ($\pi, \phi_{dirty}$) propagate into downside performance risk. Future numerical investigations will isolate these partial derivatives to determine which parameter dominates the variance in the $P_{05}$ left tail.
 
 ---
 

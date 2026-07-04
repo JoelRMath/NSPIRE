@@ -3,7 +3,7 @@
 # ==========================================
 
 #' Beta-PERT Random Number Generator (Vectorized)
-#' 
+#'
 #' @param n Integer. Number of observations.
 #' @param a Numeric vector. Minimum values.
 #' @param m Numeric vector. Mode values.
@@ -55,7 +55,7 @@ run_simulation <- function(sim_env, total_units = 100, seed = NULL) {
   units_df <- data.frame(
     unit_id = paste0("Unit_", seq_along(building_units)),
     unit_type = building_units,
-    tenant_factor = tenant_factors, 
+    tenant_factor = tenant_factors,
     stringsAsFactors = FALSE
   )
   
@@ -63,7 +63,7 @@ run_simulation <- function(sim_env, total_units = 100, seed = NULL) {
   master <- merge(units_df, long_fp, by = "unit_type", all.x = TRUE)
   master <- master[rep(seq_len(nrow(master)), master$item_count), ]
   
-  tasks <- sim_env@dag@tasks_config[, c("task_id", "category", "severity", 
+  tasks <- sim_env@dag@tasks_config[, c("task_id", "category", "severity",
                                         "p_defect", "p_miss_base", "t1_a", "t1_m", "t1_b", "cost1")]
   master <- merge(master, tasks, by = "task_id", all.x = TRUE)
   
@@ -73,9 +73,9 @@ run_simulation <- function(sim_env, total_units = 100, seed = NULL) {
   defects <- master[is_defective, ]
   
   if(nrow(defects) == 0) {
-    return(data.frame(unit_id=character(), unit_type=character(), task_id=character(), 
+    return(data.frame(unit_id=character(), unit_type=character(), task_id=character(),
                       category=character(), severity=character(), tenant_factor=numeric(),
-                      p_defect=numeric(), is_caught=logical(), 
+                      p_defect=numeric(), is_caught=logical(),
                       repair_time_mins=numeric(), material_cost=numeric()))
   }
   
@@ -104,7 +104,7 @@ schedule_repairs <- function(defects_df, sim_env, t_prep_days = 30) {
   topo_nodes <- sim_env@topo_nodes
   defects_df$task_factor <- factor(defects_df$task_id, levels = topo_nodes)
   defects_df <- defects_df[order(defects_df$unit_id, defects_df$task_factor), ]
-  defects_df$task_factor <- NULL 
+  defects_df$task_factor <- NULL
   
   scen <- sim_env@scenario
   reg_cap_hrs <- scen$temporal_strategy$regular_capacity_hours_per_unit * t_prep_days
@@ -121,6 +121,7 @@ schedule_repairs <- function(defects_df, sim_env, t_prep_days = 30) {
   ot_hours <- task_time_hrs - reg_hours
   
   defects_df$labor_cost <- round((reg_hours * base_rate) + (ot_hours * ot_rate), 2)
+  defects_df$overtime_cost <- round(ot_hours * ot_rate, 2)
   defects_df$is_overtime <- (ot_hours > 0)
   defects_df$is_backlogged <- (cum_time_hrs > (reg_cap_hrs + max_ot_hrs))
   return(defects_df)

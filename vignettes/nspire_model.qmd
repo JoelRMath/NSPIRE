@@ -263,7 +263,7 @@ Sensitivity analysis maps how variations in control parameters drive system outc
 
 The internal pre-inspection audit is modeled by $\alpha_{audit}$, the probability that a defect is identified and resolved prior to the HUD inspection. To quantify the impact of audit efficacy on compliance risk, we varied $\alpha_{audit}$ from $0.05$ (negligent) to $0.95$ (highly rigorous), executing $K=1,000$ Monte Carlo iterations per step.
 
-```{r}
+```{r, ridge-plot, fig-width: 9, fig-height: 6}
 sweep_data <- load_sensitivity_iterations(here("results", "sensitivity", "audit_rate"))
 
 # Generate the plot
@@ -276,12 +276,6 @@ plot_sensitivity_ridges(
 
 ```{r, sensitivity-gallery, fig-width: 6, fig-height: 4}
 sum_df <- readRDS(here("results", "sensitivity", "audit_rate", "summary.rds"))
-
-# 1. Failure Risk ($P_{fail}$)
-plot_sensitivity_metric(sum_df, "fail_risk_60", "Audit Catch Rate", "Prob. of Failure (Score < 60)", "Systemic Failure Risk")
-
-# 2. Tail Drop Volatility ($\tau$)
-plot_sensitivity_metric(sum_df, "tail_drop_median", "Audit Catch Rate", "Tail Drop Metric (τ)", "Downside Volatility")
 
 plot_sensitivity_multi(
   sum_df, 

@@ -3,7 +3,6 @@
 # ==========================================
 
 #' Beta-PERT Random Number Generator (Vectorized)
-#'
 #' @param n Integer. Number of observations.
 #' @param a Numeric vector. Minimum values.
 #' @param m Numeric vector. Mode values.
@@ -27,6 +26,8 @@ rpert <- function(n, a, m, b) {
 }
 
 #' Generate Building Demographics
+#' @param sim_env simulation environment
+#' @param total_units total number of units in building
 #' @export
 generate_building <- function(sim_env, total_units) {
   archetypes <- names(sim_env@building_mix)
@@ -35,13 +36,16 @@ generate_building <- function(sim_env, total_units) {
 }
 
 #' Run NSPIRE Inspection Simulation
+#' @param sim_env simulation environment
+#' @param total_units total number of units in building
+#' @param seed RNG seed
 #' @export
 run_simulation <- function(sim_env, total_units = 100, seed = NULL) {
   if (!is.null(seed)) set.seed(seed)
   
   building_units <- generate_building(sim_env, total_units)
   scen <- sim_env@scenario
-  
+
   clean_prop <- scen$tenant_factors$clean_proportion %||% 0.80
   clean_mean <- scen$tenant_factors$clean_multiplier_mean %||% 1.0
   dirty_mean <- scen$tenant_factors$dirty_multiplier_mean %||% 3.0
@@ -82,6 +86,9 @@ run_simulation <- function(sim_env, total_units = 100, seed = NULL) {
   defects$is_caught <- stats::runif(nrow(defects)) >= defects$p_miss_base
   defects$repair_time_mins <- round(rpert(nrow(defects), defects$t1_a, defects$t1_m, defects$t1_b), 2)
   
+  eff_mult <- scen$staffing$efficiency_multiplier %||% 1.0
+  defects$repair_time_mins <- defects$repair_time_mins / eff_mult
+  
   results_df <- data.frame(
     unit_id = defects$unit_id, unit_type = defects$unit_type, task_id = defects$task_id,
     category = defects$category, severity = defects$severity, tenant_factor = defects$tenant_factor,
@@ -96,35 +103,74 @@ run_simulation <- function(sim_env, total_units = 100, seed = NULL) {
   return(results_df)
 }
 
-#' Schedule Workforce Repairs
+#' Schedule Workforce Repairs (Sequential Unit-Block Assignment)
+#' @param defects_df dataframe of defects
+#' @param sim_env simulation environment
+#' @param t_prep_days total available preparation days
 #' @export
 schedule_repairs <- function(defects_df, sim_env, t_prep_days = 30) {
   if (nrow(defects_df) == 0) return(defects_df)
   
-  topo_nodes <- sim_env@topo_nodes
-  defects_df$task_factor <- factor(defects_df$task_id, levels = topo_nodes)
-  defects_df <- defects_df[order(defects_df$unit_id, defects_df$task_factor), ]
-  defects_df$task_factor <- NULL
-  
   scen <- sim_env@scenario
-  reg_cap_hrs <- scen$temporal_strategy$regular_capacity_hours_per_unit * t_prep_days
-  max_ot_hrs  <- scen$staffing$max_overtime_hours_per_unit * t_prep_days
+  num_techs <- scen$staffing$num_techs %||% 5
+  hours_per_day <- scen$staffing$hours_per_day %||% 8
+  max_ot_per_tech <- scen$staffing$max_ot_hours_per_tech %||% 2
   base_rate   <- scen$staffing$hourly_rate_internal
   ot_rate     <- base_rate * scen$staffing$overtime_multiplier
   
-  defects_df$cumulative_time_mins <- ave(defects_df$repair_time_mins, defects_df$unit_id, FUN = cumsum)
-  task_time_hrs <- defects_df$repair_time_mins / 60
-  cum_time_hrs <- defects_df$cumulative_time_mins / 60
-  time_before_task <- cum_time_hrs - task_time_hrs
+  # 1. Total capacity per tech in the prep window
   
-  reg_hours <- pmin(task_time_hrs, pmax(0, reg_cap_hrs - time_before_task))
-  ot_hours <- task_time_hrs - reg_hours
+  total_reg_cap_hrs <- hours_per_day * t_prep_days
+  total_ot_cap_hrs  <- max_ot_per_tech * t_prep_days
+  total_tech_cap    <- total_reg_cap_hrs + total_ot_cap_hrs
   
-  defects_df$labor_cost <- round((reg_hours * base_rate) + (ot_hours * ot_rate), 2)
-  defects_df$overtime_cost <- round(ot_hours * ot_rate, 2)
-  defects_df$is_overtime <- (ot_hours > 0)
-  defects_df$is_backlogged <- (cum_time_hrs > (reg_cap_hrs + max_ot_hrs))
-  return(defects_df)
+  # 2. Aggregate time required per unit
+  
+  unit_summaries <- aggregate(repair_time_mins ~ unit_id, data = defects_df, sum)
+  unit_summaries$repair_time_hrs <- unit_summaries$repair_time_mins / 60
+  unit_summaries <- unit_summaries[order(unit_summaries$unit_id), ]
+  
+  # 3. Partition units across tech pool (Round-robin)
+  
+  n_units <- nrow(unit_summaries)
+  unit_summaries$assigned_tech <- (seq_len(n_units) - 1) %% num_techs
+  
+  # 4. Process queues for each tech
+  results_costs <- list()    # <-- Add this!
+  results_defects <- list()
+  
+  results <- list()
+  for (t_id in 0:(num_techs - 1)) {
+    tech_queue <- unit_summaries[unit_summaries$assigned_tech == t_id, ]
+    tech_queue$cum_time_hrs <- cumsum(tech_queue$repair_time_hrs)
+    tech_queue$unit_start_hrs <- tech_queue$cum_time_hrs - tech_queue$repair_time_hrs
+    
+    # Vectorized Capacity Bucketing
+    tech_queue$reg_hours <- pmin(tech_queue$repair_time_hrs, 
+                                 pmax(0, total_reg_cap_hrs - tech_queue$unit_start_hrs))
+    
+    tech_queue$ot_hours <- pmin(tech_queue$repair_time_hrs - tech_queue$reg_hours,
+                                pmax(0, total_ot_cap_hrs - pmax(0, tech_queue$unit_start_hrs - total_reg_cap_hrs)))
+    
+    # Calculate costs for this tech's queue
+    tech_queue$labor_cost    <- round((tech_queue$reg_hours * base_rate) + (tech_queue$ot_hours * ot_rate), 2)
+    tech_queue$overtime_cost <- round(tech_queue$ot_hours * ot_rate, 2)
+    tech_queue$is_backlogged <- tech_queue$cum_time_hrs > total_tech_cap
+    
+    # Now map these results back to the individual defects within these units
+    # We create a mapping subset for this tech
+    tech_meta <- tech_queue[, c("unit_id", "labor_cost", "overtime_cost", "is_backlogged")]
+    tech_defects <- defects_df[defects_df$unit_id %in% tech_queue$unit_id, ]
+    
+    results_costs[[t_id + 1]] <- tech_queue[, c("unit_id", "labor_cost", "overtime_cost", "is_backlogged")]
+    results[[t_id + 1]] <- merge(tech_defects, tech_meta, by = "unit_id")
+  }
+  
+  return(list(
+    costs = do.call(rbind, results_costs),
+    defects = do.call(rbind, results_defects)
+  ))
 }
 
+# small helper
 `%||%` <- function(a, b) if (!is.null(a)) a else b

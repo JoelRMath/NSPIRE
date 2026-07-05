@@ -2,11 +2,12 @@ scenario_name: "The Balanced Strategy (30-Day Window)"
 description: "Starts prep 1 month out, utilizing 2-tech teams with mild synergy."
 
 staffing:
-  techs_per_unit: 2
-  efficiency_multiplier: 1.10         # 10% speed bonus for teamwork
+  num_techs: 5
+  hours_per_day: 8
+  max_ot_hours_per_tech: 2      # Fatigue cap
   hourly_rate_internal: 45.00
   overtime_multiplier: 1.50
-  max_overtime_hours_per_unit: 8      # Hard cap on OT spending per unit
+  efficiency_multiplier: 1.10
 
 temporal_strategy:
   days_before_inspection: 30          # When the prep cycle begins

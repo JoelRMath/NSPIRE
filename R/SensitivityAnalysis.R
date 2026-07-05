@@ -40,6 +40,17 @@ run_sensitivity_analysis <- function(sim_env, score_csv, param_name, param_value
     if (save_raw) {
       saveRDS(mc_out$raw, file = file.path(base_dir, paste0("raw_full_", val, ".rds")))
     }
+    scores_raw <- unlist(mc_out$summary$score)
+    min_bound <- max(0, min(scores_raw) - 2)
+    max_bound <- min(100, max(scores_raw) + 2)
+    score_density <- density(
+      scores_raw,
+      from = min_bound,
+      to = max_bound,
+      n = 512
+    )
+    density_filename <- sprintf("score_density_%s.rds", val)
+    saveRDS(score_density, file = file.path(base_dir, paste0("score_density_", val, ".rds")))
     
     # 4. Exhaustive Observables Calculation
     scores <- mc_out$summary$score

@@ -12,6 +12,17 @@ format:
     embed-resources: true
 ---
 
+```{r}
+devtools::load_all(".")
+
+# 2. Load the external libraries needed for the joyplot
+library(ggplot2)
+library(ggridges)
+library(viridis)
+library(here)
+library(tidyr)
+```
+
 # 1. Introduction
 
 This document outlines the foundational mathematical model for optimizing maintenance resource allocation ahead of an NSPIRE (National Standards for the Physical Inspection of Real Estate) inspection. The objective is to maximize the expected effective score by traversing a dependency-constrained network of tasks, evaluated via Monte Carlo simulations to account for operational stochastics.
@@ -226,21 +237,61 @@ Standard deviation ($\sigma$) and the Coefficient of Variation ($CV = \sigma/\mu
 
 To quantify this downside volatility, we define the **Tail Drop Metric** ($\tau$):
 
-$$\tau = \frac{\mu - Z_{05}}{\mu}$$
+$$\tau = \frac{\text{med} - Z_{05}}{\text{med}}$$
 
 Where:
 
-*   $\mu$ is the expected mean effective score.
+*   $\text{med}$ is the median score.
 *   $Z_{05}$ is the 5th percentile of the simulated scores (the "Value at Risk").
 
-$\tau$ represents the percentage degradation from expected performance to the worst-case scenario. A property may exhibit a high $\mu$ while maintaining a high $\tau$, identifying it as a "lottery" asset—stable on average, but highly susceptible to non-linear drops in score due to the interaction of unit sampling variance and tenant-driven decay.
+$\tau$ represents the percentage degradation from expected performance to the worst-case scenario. A property may exhibit a high $\text{med}$ while maintaining a high $\tau$, identifying it as a "lottery" asset—stable on average, but highly susceptible to non-linear drops in score due to the interaction of unit sampling variance and tenant-driven decay.
 
 ## 9.3. Sensitivity Mapping
 
 The Tail Drop Metric $\tau$ is a systemic output of our model, functionally defined by the interaction of our control and stochastic parameters:
 $$\tau = f(n(N), \alpha_{audit}, \pi, \phi_{dirty})$$
 
-This sensitivity function captures how variance in the HUD sampling tier $n(N)$, human error in pre-inspection audit ($\alpha_{audit}$), and the underlying distribution of tenant impact ($\pi, \phi_{dirty}$) propagate into downside performance risk. Future numerical investigations will isolate these partial derivatives to determine which parameter dominates the variance in the $P_{05}$ left tail.
+This sensitivity function captures how variance in the HUD sampling tier $n(N)$, human error in pre-inspection audit ($\alpha_{audit}$), and the underlying distribution of tenant impact ($\pi, \phi_{dirty}$) propagate into downside performance risk. Future numerical investigations will isolate these partial derivatives to determine which parameter dominates the variance in the $Z_{05}$ left tail.
+
+---
+
+# 10. Parameter Sensitivity Analysis
+
+Sensitivity analysis maps how variations in control parameters drive system outcomes, such as expected score, labor costs, and downside risk ($P_{fail}$ and $\tau$). By studying these variables across parameter ranges, we can identify parameter critical ranges, non-linear thresholds and pinpoint optimal resource allocations within the NSPIRE framework.
+
+## 10.1. Audit Catch Rate ($\alpha_{audit}$)
+
+The internal pre-inspection audit is modeled by $\alpha_{audit}$, the probability that a defect is identified and resolved prior to the HUD inspection. To quantify the impact of audit efficacy on compliance risk, we varied $\alpha_{audit}$ from $0.05$ (negligent) to $0.95$ (highly rigorous), executing $K=1,000$ Monte Carlo iterations per step.
+
+```{r}
+sweep_data <- load_sensitivity_iterations(here("results", "sensitivity", "audit_rate"))
+
+# Generate the plot
+plot_sensitivity_ridges(
+  sensitivity_df = sweep_data,
+  param_label = "Audit Catch Rate (Efficacy)",
+  title = "Systemic Risk Transition: Audit Rate vs. Score Distribution"
+)
+```
+
+```{r, sensitivity-gallery, fig-width: 6, fig-height: 4}
+sum_df <- readRDS(here("results", "sensitivity", "audit_rate", "summary.rds"))
+
+# 1. Failure Risk ($P_{fail}$)
+plot_sensitivity_metric(sum_df, "fail_risk_60", "Audit Catch Rate", "Prob. of Failure (Score < 60)", "Systemic Failure Risk")
+
+# 2. Tail Drop Volatility ($\tau$)
+plot_sensitivity_metric(sum_df, "tail_drop_median", "Audit Catch Rate", "Tail Drop Metric (τ)", "Downside Volatility")
+
+plot_sensitivity_multi(
+  sum_df, 
+  y_vars = c("fail_risk_60", "critical_fail_risk_30"),
+  param_label = "Audit Catch Rate",
+  y_label = "Probability",
+  title = "Impact of Audit Efficacy on Regulatory Failure"
+)
+
+```
 
 ---
 

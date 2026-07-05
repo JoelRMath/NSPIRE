@@ -119,10 +119,10 @@ run_sensitivity_analysis <- function(sim_env, score_csv, param_name, param_value
 #' @export
 study_audit_rate <- function(n_iterations = 1000, save_raw = FALSE) {
   
-  dag_csv <- "results/sensitivity/tasks_config.csv"
-  fp_csv <- "results/sensitivity/floorplans_config.csv"
-  yaml_path <- "results/sensitivity/scenario1.yml"
-  score_csv <- "results/sensitivity/scoring_config.csv"
+  dag_csv <- "results/sensitivity/audit_rate/tasks_config.csv"
+  fp_csv <- "results/sensitivity/audit_rate/floorplans_config.csv"
+  yaml_path <- "results/sensitivity/audit_rate/scenario1.yml"
+  score_csv <- "results/sensitivity/audit_rate/scoring_config.csv"
   
   mix_weights <- c("Studio" = 10, "1BR_1BA" = 40, "2BR_1BA" = 20, "2BR_2BA" = 20, "3BR_2BA" = 10)
   sim_env <- create_simulation_env(dag_csv, fp_csv, yaml_path, mix_weights)

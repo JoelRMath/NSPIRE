@@ -13,14 +13,19 @@ format:
 ---
 
 ```{r}
-devtools::load_all(".")
+#| label: setup
+#| echo: false
+#| message: false
+#| warning: false
 
-# 2. Load the external libraries needed for the joyplot
+devtools::load_all(".")
 library(ggplot2)
 library(ggridges)
 library(viridis)
 library(here)
 library(tidyr)
+library(scales)
+library(patchwork)
 ```
 
 # 1. Introduction
@@ -263,18 +268,52 @@ Sensitivity analysis maps how variations in control parameters drive system outc
 
 The internal pre-inspection audit is modeled by $\alpha_{audit}$, the probability that a defect is identified and resolved prior to the HUD inspection. To quantify the impact of audit efficacy on compliance risk, we varied $\alpha_{audit}$ from $0.05$ (negligent) to $0.95$ (highly rigorous), executing $K=1,000$ Monte Carlo iterations per step.
 
-```{r, ridge-plot, fig-width: 9, fig-height: 6}
+```{r}
+#| label: fig-audit-ridges
+#| fig-width: 9
+#| fig-height: 6
+#| echo: false
+#| message: false
+#| warning: false
+#| fig-cap: "Risk Transition: Audit Rate vs. Score Distribution."
+
 sweep_data <- load_sensitivity_iterations(here("results", "sensitivity", "audit_rate"))
 
 # Generate the plot
 plot_sensitivity_ridges(
   sensitivity_df = sweep_data,
   param_label = "Audit Catch Rate (Efficacy)",
-  title = "Systemic Risk Transition: Audit Rate vs. Score Distribution"
+  title = "Audit Rate vs. Score Distribution"
 )
 ```
 
-```{r, sensitivity-gallery, fig-width: 6, fig-height: 4}
+
+```{r distribution-slice, fig.width=12, fig.height=6}
+# 1. Define the scenarios
+scenarios <- c(0.55, 0.85)
+sum_df <- readRDS(here("results", "sensitivity", "audit_rate", "summary.rds"))
+pal <- scales::viridis_pal(option = "D")(100) # Pre-generate palette
+
+plots <- lapply(scenarios, function(rate) {
+  # 1. Cast both to numeric to ensure they match
+  median_val <- sum_df$score_median[as.numeric(sum_df$param_val) == as.numeric(rate)]
+  
+  # 2. Pick color based on median score (0-100 mapped to 1-100 index)
+  idx <- max(1, min(100, round(median_val)))
+  
+  plot_score_distribution(
+    input = here("results", "sensitivity", "audit_rate", paste0("score_density_", rate, ".rds")),
+    title = paste("Audit Catch Rate:", rate * 100, "%"),
+    color_hex = pal[idx]
+  )
+})
+
+plots[[1]] | plots[[2]]
+
+```
+
+
+```{r sensitivity-gallery, fig-width: 6, fig-height: 4}
 sum_df <- readRDS(here("results", "sensitivity", "audit_rate", "summary.rds"))
 
 plot_sensitivity_multi(
@@ -284,7 +323,6 @@ plot_sensitivity_multi(
   y_label = "Probability",
   title = "Impact of Audit Efficacy on Regulatory Failure"
 )
-
 ```
 
 ---

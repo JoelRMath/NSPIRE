@@ -4,47 +4,31 @@
 
 #' Plot Monte Carlo Score Distribution
 #'
-#' Visualizes the distribution of final NSPIRE scores from a Monte Carlo simulation,
-#' highlighting the 5th percentile risk tail and the HUD failure threshold (60).
-#'
-#' @param mc_results A \code{data.frame} output from \code{run_monte_carlo}.
-#' @param title Character. The title of the plot.
-#' @param failure_threshold Numeric. The score below which enforcement actions trigger (default 60).
+#' @param input Path to a score_density_*.rds file.
+#' @param title Character.
+#' @param color_hex Character. The exact hex color to fill.
+#' @param failure_threshold Numeric.
 #' @export
-plot_score_distribution <- function(mc_results, title = "NSPIRE Score Distribution", failure_threshold = 60) {
-  scores <- as.numeric(mc_results$score)
+plot_score_distribution <- function(input, title = "NSPIRE Score Distribution", color_hex = "#5292f9", failure_threshold = 60) {
   
-  # Calculate Key Metrics
-  mean_score <- mean(scores)
-  p05_score <- quantile(scores, 0.05)
-  fail_prob <- mean(scores < failure_threshold) * 100
+  dens_obj <- readRDS(input)
+  plot_df <- data.frame(x = dens_obj$x, y = dens_obj$y)
   
-  # Setup the plot area
-  dens <- density(scores, from = max(0, min(scores)-5), to = 100)
-  
-  plot(dens, main = title, xlab = "Final NSPIRE Score", ylab = "Density", 
-       lwd = 2, col = "darkblue", xlim = c(min(scores), 100))
-  
-  # Shade the failure zone (below 60)
-  polygon(c(dens$x[dens$x <= failure_threshold], failure_threshold, min(dens$x)), 
-          c(dens$y[dens$x <= failure_threshold], 0, 0), 
-          col = rgb(1, 0, 0, 0.2), border = NA)
-  
-  # Add vertical lines for Mean and 5th Percentile
-  abline(v = mean_score, col = "black", lwd = 2, lty = 2)
-  abline(v = p05_score, col = "red", lwd = 2, lty = 2)
-  
-  # Add Legend
-  legend("topleft", 
-         legend = c(
-           sprintf("Mean Score: %.1f", mean_score),
-           sprintf("5th Percentile: %.1f", p05_score),
-           sprintf("Failure Risk: %.1f%%", fail_prob)
-         ),
-         col = c("black", "red", "white"), 
-         lty = c(2, 2, 0), lwd = 2, bty = "n")
+  ggplot2::ggplot(plot_df, ggplot2::aes(x = x, y = y)) +
+    ggplot2::geom_area(data = subset(plot_df, x < failure_threshold), fill = "#b3261e", alpha = 0.4) +
+    ggplot2::geom_area(fill = color_hex, alpha = 0.6) +
+    ggplot2::geom_line(color = "black", linewidth = 0.5) +
+    ggplot2::geom_vline(xintercept = failure_threshold, linetype = "dashed", color = "#b3261e", linewidth = 0.8) +
+    ggplot2::labs(title = title, x = "Final NSPIRE Score", y = "Density") +
+    ggplot2::theme_minimal() +
+    ggplot2::theme(
+      plot.title = ggplot2::element_text(face = "bold", size = 12),
+      panel.grid.minor = ggplot2::element_blank(),
+      plot.margin = ggplot2::margin(t = 5, r = 5, b = 5, l = 5),
+      panel.border = ggplot2::element_rect(color = "gray", fill = NA, linewidth = 0.5),
+      plot.background = ggplot2::element_rect(color = "gray", fill = NA, linewidth = 0.5)
+    )
 }
-
 #' Plot Sensitivity Ridgeline (Joyplot)
 #'
 #' Generates an overlapping density (ridgeline) plot to visualize the

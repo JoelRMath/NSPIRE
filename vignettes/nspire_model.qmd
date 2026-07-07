@@ -133,14 +133,14 @@ If a task evaluates to a severe state requiring external licensing or specializa
 Execution of a task does not guarantee absolute resolution. A task has a baseline probability ($p_{err}$) of being missed or improperly repaired.
 
 ## 6.1. Audit Efficacy
-We introduce a formal internal audit efficacy parameter, $\alpha_{audit} \in [0, 1]$, representing the probability that the pre-inspection internal team detects and successfully mitigates a defect. 
+We introduce a formal internal audit efficacy parameter, $\alpha_\text{audit} \in [0, 1]$, representing the probability that the pre-inspection internal team detects and successfully mitigates a defect. 
 
 If a defect survives the initial repair attempt (with probability $p_{err}$), the probability that it remains undetected by the audit phase is:
-$$P(\text{Survive}) = (1 - \alpha_{audit}) \cdot p_{err}$$
+$$P(\text{Survive}) = (1 - \alpha_\text{audit}) \cdot p_{err}$$
 
 ## 6.2. Technician Redundancy
 * **Serial Execution (Single Technician):** The probability of a defect surviving into the inspection phase follows the logic in 6.1.
-* **Parallel Execution (Dual Technicians):** Applying the "Four Eyes" principle, independent cross-checking drastically reduces error. The joint probability of both technicians missing the defect becomes $P(\text{Survive}) = (1 - \alpha_{audit}) \cdot p_{err}^2$.
+* **Parallel Execution (Dual Technicians):** Applying the "Four Eyes" principle, independent cross-checking drastically reduces error. The joint probability of both technicians missing the defect becomes $P(\text{Survive}) = (1 - \alpha_\text{audit}) \cdot p_{err}^2$.
 
 # 7. Temporal Windowing and Asset Decay
 
@@ -242,31 +242,31 @@ Standard deviation ($\sigma$) and the Coefficient of Variation ($CV = \sigma/\mu
 
 To quantify this downside volatility, we define the **Tail Drop Metric** ($\tau$):
 
-$$\tau = \frac{\text{med} - Z_{05}}{\text{med}}$$
+$$\tau = \frac{\text{med} - P_{05}}{\text{med}}$$ {#eq-tau}
 
 Where:
 
 *   $\text{med}$ is the median score.
-*   $Z_{05}$ is the 5th percentile of the simulated scores (the "Value at Risk").
+*   $P_{05}$ is the 5th percentile of the simulated scores (the "Value at Risk").
 
 $\tau$ represents the percentage degradation from expected performance to the worst-case scenario. A property may exhibit a high $\text{med}$ while maintaining a high $\tau$, identifying it as a "lottery" asset—stable on average, but highly susceptible to non-linear drops in score due to the interaction of unit sampling variance and tenant-driven decay.
 
 ## 9.3. Sensitivity Mapping
 
 The Tail Drop Metric $\tau$ is a systemic output of our model, functionally defined by the interaction of our control and stochastic parameters:
-$$\tau = f(n(N), \alpha_{audit}, \pi, \phi_{dirty})$$
+$$\tau = f(n(N), \alpha_\text{audit}, \pi, \phi_{dirty})$$
 
-This sensitivity function captures how variance in the HUD sampling tier $n(N)$, human error in pre-inspection audit ($\alpha_{audit}$), and the underlying distribution of tenant impact ($\pi, \phi_{dirty}$) propagate into downside performance risk. Future numerical investigations will isolate these partial derivatives to determine which parameter dominates the variance in the $Z_{05}$ left tail.
+This sensitivity function captures how variance in the HUD sampling tier $n(N)$, human error in pre-inspection audit ($\alpha_\text{audit}$), and the underlying distribution of tenant impact ($\pi, \phi_{dirty}$) propagate into downside performance risk. Future numerical investigations will isolate these partial derivatives to determine which parameter dominates the variance in the $P_{05}$ left tail.
 
 ---
 
 # 10. Parameter Sensitivity Analysis
 
-Sensitivity analysis maps how variations in control parameters drive system outcomes, such as expected score, labor costs, and downside risk ($P_{fail}$ and $\tau$). By studying these variables across parameter ranges, we can identify parameter critical ranges, non-linear thresholds and pinpoint optimal resource allocations within the NSPIRE framework.
+Sensitivity analysis studies how variations in control parameters drive system outcomes, such as expected score, labor costs, and downside risk ($P_{fail}$ and $\tau$). By studying these variables across parameter ranges, one can identify parameter critical ranges, non-linear thresholds and propose optimal resource allocations within the NSPIRE framework.
 
-## 10.1. Audit Catch Rate ($\alpha_{audit}$)
+## 10.1. Audit Catch Rate ($\alpha_\text{audit}$)
 
-The internal pre-inspection audit is modeled by $\alpha_{audit}$, the probability that a defect is identified and resolved prior to the HUD inspection. To quantify the impact of audit efficacy on compliance risk, we varied $\alpha_{audit}$ from $0.05$ (negligent) to $0.95$ (highly rigorous), executing $K=1,000$ Monte Carlo iterations per step.
+The internal pre-inspection audit is modeled by $\alpha_\text{audit}$, the probability that a defect is identified and resolved prior to the HUD inspection. To quantify the impact of audit efficacy on compliance risk, $\alpha_\text{audit}$ was varied from $0.05$ (negligent) to $0.95$ (highly rigorous), while executing $K=1,000$ Monte Carlo iterations per step. @fig-audit-ridges provides a visual summary of the resulting score distributions (horizontal axis with a red line for the failing score of 60) as a function of $\alpha_\text{audit}$ (vertical axis).
 
 ```{r}
 #| label: fig-audit-ridges
@@ -287,8 +287,18 @@ plot_sensitivity_ridges(
 )
 ```
 
+Failure risk is almost completely eliminated when $\alpha_\text{audit} \geq 0.9$. @fig-distribution-slice further explains the transition from high risk to low risk as $\alpha_\text{audit}$ increases from 0.55 to 0.85. The failure risk is best estimated with the proportion of simulations (among $K=1,000$) that yield a score below 60 (red vertical line). Visually, this corresponds to the area under the density curve (integral) to the left of the critical red line. 
 
-```{r distribution-slice, fig.width=12, fig.height=6}
+
+```{r} 
+#| label: fig-distribution-slice
+#| fig.width: 12 
+#| fig.height: 6
+#| echo: false
+#| message: false
+#| warning: false
+#| fig-cap: "Examples of Score Distribution: $\\alpha_\\text{audit} = 0.55$ (left) and $\\alpha_\\text{audit} = 0.85$ (right)."
+
 # 1. Define the scenarios
 scenarios <- c(0.55, 0.85)
 sum_df <- readRDS(here("results", "sensitivity", "audit_rate", "summary.rds"))
@@ -312,8 +322,17 @@ plots[[1]] | plots[[2]]
 
 ```
 
+Estimating both failure risks (score less than 30 or less than 60) at all values of $\alpha_\text{audit}$ yields @fig-failure-audit. The data demonstrates that critical failure risk (score < 30) is only marginalized when audit catch rates exceed 0.75, while full protection against standard failure (score < 60) requires efficacy above 0.90.
 
-```{r sensitivity-gallery, fig-width: 6, fig-height: 4}
+```{r}
+#| label: fig-failure-audit
+#| fig.width: 6
+#| fig.height: 4
+#| echo: false
+#| message: false
+#| warning: false
+#| fig-cap: "Failure probabilities at scores 30 and 60 as a function of audit catch rate $\\alpha_\\text{audit}$."
+
 sum_df <- readRDS(here("results", "sensitivity", "audit_rate", "summary.rds"))
 
 plot_sensitivity_multi(
@@ -324,6 +343,121 @@ plot_sensitivity_multi(
   title = "Impact of Audit Efficacy on Regulatory Failure"
 )
 ```
+
+Besides failure probabilities, another useful statistic is the tail-drop metric $\tau$ @eq-tau. To understand its sensitivity to $\alpha_\text{audit}$, we must first examine how the foundational score statistics evolve across the parameter range. These plots are displayed in @fig-dist-stats-audit.
+
+```{r}
+#| label: fig-dist-stats-audit
+#| fig.width: 6
+#| fig.height: 4
+#| echo: false
+#| message: false
+#| warning: false
+#| fig-cap: "Score statistics as a function of audit catch rate $\\alpha_\\text{audit}$."
+
+sum_df <- readRDS(here("results", "sensitivity", "audit_rate", "summary.rds"))
+
+plot_sensitivity_multi(
+  sum_df, 
+  y_vars = c("score_p05", "score_median", "score_sd"),
+  param_label = "Audit Catch Rate",
+  y_label = "Score",
+  title = "Impact of Audit Efficacy on Score Statistics"
+)
+```
+
+As $\alpha_\text{audit}$ increases beyond 0.25, the score median starts rising linearly. Later, as $\alpha_\text{audit}$ gets above 0.45, the 5th percentile score $P_{05}$ also rises linearly but with a stiffer slope. This yields decreasing differences between median and 5th percentile. One way to visualize this is to plot the standard deviation of the score (a proxy measure for difference between median and 5th percentile) as a function of $\alpha_\text{audit}$. These behaviors of the different statistics yield the profile of $\tau$ @eq-tau as a function of $\alpha_\text{audit}$ displayed in @fig-tau-audit.
+
+```{r}
+#| label: fig-tau-audit
+#| fig.width: 6
+#| fig.height: 4
+#| echo: false
+#| message: false
+#| warning: false
+#| fig-cap: "Tail drop metric $\\tau$ as a function of audit catch rate $\\alpha_\\text{audit}$."
+
+sum_df <- readRDS(here("results", "sensitivity", "audit_rate", "summary.rds"))
+
+plot_sensitivity_multi(
+  sum_df, 
+  y_vars = c("tail_drop_median"),
+  param_label = "Audit Catch Rate",
+  y_label = "Tail Drop Metric",
+  title = "Impact of Audit Efficacy on Tail Drop Metric."
+)
+```
+
+**Conclusions for $\alpha_\text{audit}$**:
+
+* Operational Futility Threshold ($\alpha_\text{audit} \leq 0.25$): Below ~25%
+efficacy, quality assurance efforts are mathematically invisible to the final metric due to the absolute scoring floor (0).
+
+* Variance Squeeze ($0.45 < \alpha_\text{audit} < 0.90$): As the catch rate rises above 0.45, the 5th percentile worst-case outcome ($P_{05}$) improves at a faster linear rate than the median. This compresses the score variance and significantly reduces the Tail Drop metric ($\tau$).
+
+* Safety Baseline ($\alpha_\text{audit} \geq 0.90$): To confidently eliminate standard regulatory failure risk (score < 60), the internal audit process must successfully intercept at least 90% of all pre-existing defects.
+
+---
+
+## 10.2. The Time Crunch: Notice of Inspection ($t_\text{start}$)
+
+While a robust audit catch rate ($\alpha_\text{audit}$) is critical for passing an NSPIRE inspection, it assumes the maintenance team has the physical time to execute the repairs. HUD inspection notices can vary drastically, sometimes providing as little as 14 to 30 days of warning.
+
+To model this operational squeeze, the preparation window ($t_\text{start}$) was swept from 36 days down to 4 days. For this specific scenario, the internal audit catch rate was fixed at a highly effective 85% ($\alpha_\text{audit} = 0.85$), and maximum allowable overtime was expanded to 4 hours per unit per day. Crucially, the simulation incorporates context-aware transit friction: technicians incur small delays (1–5 minutes) when moving between tasks in the same unit, but significant delays (15–30 minutes) when packing up and accessing a new unit.
+
+As the preparation window shrinks, the volume of identified defects remains constant, but the time available to clear them—and the time available to walk between them—compresses. The initial impact is purely financial, as visualized in @fig-time-crunch-labor.
+
+```{r}
+#| label: fig-time-crunch-labor
+#| fig-width: 6
+#| fig-height: 4
+#| echo: false
+#| message: false
+#| warning: false
+#| fig-cap: "Mean total labor cost and overtime cost as the preparation window ($t_\\text{start}$) changes. Note the massive overtime spike at Day 22 followed by the sharp drop in total costs as the timeline collapses."
+
+sum_df_time <- readRDS(here("results", "sensitivity", "t_start", "master_time_crunch_study.rds"))
+
+plot_sensitivity_multi(
+  sum_df_time, 
+  y_vars = c("total_cost_mean", "overtime_mean"),
+  param_label = "Days of Notice (t_start)",
+  y_label = "Cost ($)",
+  title = "Financial Impact of Compressed Prep Windows"
+)
+```
+
+At first glance, the left side of @fig-time-crunch-labor appears counter-intuitive: as the preparation window drops below 20 days, the total expected cost plunges dramatically. This is not an efficiency gain; it is the mathematical manifestation of deferred maintenance.
+
+Between Day 30 and Day 22, the workforce heavily leverages their overtime allowance to keep pace with the workload. At Day 22, the system hits peak labor output—the team is operating at absolute maximum capacity, driving overtime spend to its highest point. However, as the window shrinks below 20 days, the absolute physical capacity of the workforce is exhausted. Hundreds of items are forced into the "backlog." Because backlogged items are abandoned, they incur no labor and no material costs, creating a "false economy" of savings.
+
+@fig-time-crunch-backlog illustrates the severe regulatory consequences of this capacity exhaustion.
+
+```{r}
+#| label: fig-time-crunch-backlog
+#| fig-width: 6
+#| fig-height: 4
+#| echo: false
+#| message: false
+#| warning: false
+#| fig-cap: "Probability of generating a task backlog and the resulting regulatory failure risk ($<60$) under compressed timelines."
+
+plot_sensitivity_multi(
+  sum_df_time, 
+  y_vars = c("backlog_prob", "fail_risk_60"),
+  param_label = "Days of Notice (t_start)",
+  y_label = "Probability",
+  title = "The Backlog Cliff: Capacity Exhaustion"
+)
+```
+
+**Conclusions for $t_\text{start}$**:
+
+**Distributed Defect Tax ($t_\text{start} \geq 28$)**: Because repairing widely distributed defects incurs a heavy transit-time penalty, a 28-day notice is the edge of the safe operational limit for this property. At 28 days, the property maintains a near 0% failure risk with minimal overtime expenditure.
+
+**Maximum Effort Peak ($t_\text{start} \approx 22$)**: Day 22 represents the system's breaking point. Overtime spend reaches its absolute maximum as the team attempts to outwork the shrinking timeline. Despite spending heavily on premium labor, the backlog probability reaches ~50%, and the property begins to exhibit a measurable risk of regulatory failure. The team is throwing maximum capital at the problem but is still losing ground.
+
+**Operational Collapse ($t_\text{start} \leq 15$)**: A standard 14-day HUD notice is mathematically unfeasible for a property in this state and with 5 technicians. By Day 15, the probability of backlogging tasks reaches 100%, and the property's risk of failure exceeds 85%. The simulation proves that sudden drops in preparation expenditure in the days leading up to an inspection are a lagging indicator of capacity exhaustion, representing a forced trade-off of immediate OpEx savings for guaranteed regulatory failure.
 
 ---
 

@@ -225,7 +225,7 @@ plot_sensitivity_multi <- function(sensitivity_df, y_vars, param_label = "Parame
   
   ggplot2::ggplot(df_long, ggplot2::aes(x = param_val, y = value, color = metric)) +
     ggplot2::geom_line(linewidth = 1.2) +
-    ggplot2::geom_point(size = 2) +
+    ggplot2::geom_point(shape = 21, fill = "white", size = 1.5, stroke = 1) +
     ggplot2::scale_color_manual(values = manual_colors, guide = ggplot2::guide_legend(title = "Metric")) +
     ggplot2::labs(title = title, x = param_label, y = y_label) +
     ggplot2::theme_minimal() +

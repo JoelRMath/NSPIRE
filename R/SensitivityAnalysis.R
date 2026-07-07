@@ -172,3 +172,47 @@ study_audit_rate <- function(n_iterations = 1000, save_raw = FALSE) {
   
   return(master_summary)
 }
+
+#' Self-Contained Study: Time Crunch (Prep Window) Sensitivity
+#'
+#' Runs a sweep of the t_start parameter to observe non-linear spikes in overtime.
+#'
+#' @param n_iterations Number of Monte Carlo iterations per step.
+#' @param save_raw Logical. Save raw defect forensics.
+#' @export
+study_prep_time <- function(n_iterations = 1000, save_raw = FALSE) {
+  
+  dag_csv <- "results/sensitivity/t_start/tasks_config.csv"
+  fp_csv <- "results/sensitivity/t_start/floorplans_config.csv"
+  yaml_path <- "results/sensitivity/t_start/scenario1.yml"
+  score_csv <- "results/sensitivity/t_start/scoring_config.csv"
+  
+  
+  mix_weights <- c("Studio" = 10, "1BR_1BA" = 40, "2BR_1BA" = 20, "2BR_2BA" = 20, "3BR_2BA" = 10)
+  sim_env <- create_simulation_env(dag_csv, fp_csv, yaml_path, mix_weights)
+  
+  cat("\n")
+  cat("          Starting Time Crunch Study                \n")
+  cat("\n")
+  
+  time_test_values <- seq(36, 4, by = -1)
+  
+  master_summary <- run_sensitivity_analysis(
+    sim_env = sim_env,
+    score_csv = score_csv,
+    param_name = "t_start",
+    param_values = time_test_values,
+    n_iterations = n_iterations,
+    save_raw = save_raw,
+    audit_catch_rate = 0.85
+  )
+  
+  base_dir <- file.path("results", "sensitivity", "t_start")
+  saveRDS(master_summary, file = file.path(base_dir, "master_time_crunch_study.rds"))
+  write.csv(master_summary, file = file.path(base_dir, "master_time_crunch_study.csv"), row.names = FALSE)
+  
+  cat("\nStudy complete. Master summaries saved to:\n")
+  cat(file.path(base_dir, "master_time_crunch_study.csv"), "\n")
+  
+  return(master_summary)
+}

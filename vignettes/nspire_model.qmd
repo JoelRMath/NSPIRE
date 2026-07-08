@@ -1,5 +1,5 @@
 ---
-title: "NSPIRE Inspection Optimization Model"
+title: "Optimization of Pre-NSPIRE Inspection Work via Monte Carlo Simulation"
 author: "Joël R. Pradines, Ph.D."
 date: today
 format:
@@ -30,7 +30,13 @@ library(patchwork)
 
 # 1. Introduction
 
-This document outlines the foundational mathematical model for optimizing maintenance resource allocation ahead of an NSPIRE (National Standards for the Physical Inspection of Real Estate) inspection. The objective is to maximize the expected effective score by traversing a dependency-constrained network of tasks, evaluated via Monte Carlo simulations to account for operational stochastics.
+This document presents a data-driven approach for optimizing maintenance work ahead of a HUD NSPIRE (National Standards for the Physical Inspection of Real Estate) inspection. By utilizing mathematical techniques such as Monte Carlo sampling, the model runs thousands of "virtual inspections" to provide probabilistic estimations of key outcomes, such as the risk of regulatory failure.
+
+To mirror real-world operations, the preparation work is modeled as a dependency-constrained network of tasks—a strict operational flowchart. This framework is highly adaptable and can be easily customized with configuration files to fit different building floorplans, tenant cleanliness levels, and inspection timelines.
+
+Ultimately, the primary role of this modeling is prescriptive: it is designed to identify critical operational bottlenecks and the specific parameter thresholds that most heavily impact the probability of a successful inspection and overall preparation cost.
+
+
 
 # 2. The NSPIRE Scoring Mechanism
 
@@ -64,10 +70,12 @@ $$S_{eff} = S_{raw} \cdot H(0.5 - n_{LT})$$
 
 # 3. Probabilistic Sampling and Realizations
 
-The inspection score is not a deterministic value but a random variable $S(\omega)$ dependent on the state $\omega$ (the realization of all random variables). 
+The inspection score is not a single, guaranteed number (a deterministic value). Instead, it is a **random variable**, representing the final outcome of many smaller random events—much like rolling a pair of dice. For example, whether the kitchen GFCI in Unit 1 happens to break today is a random event; whether the HUD inspector randomly chooses to inspect Unit 1 is another.
+
+Because of this randomness, running a single simulation (rolling the dice once) is not very informative. However, by running thousands of virtual inspections, called Monte Carlo simulations, we can build a complete score distribution. This allows us to move beyond guessing and mathematically estimate precise probabilities, such as the exact risk of failing the inspection (scoring below 60).
 
 ## 3.1. Stochastic Unit Sampling
-HUD inspection protocols dictate that units are sampled without replacement. For a property with $N$ total units, the inspector chooses a subset $n(N)$ based on the tiered sampling schedule defined in Table 1.
+HUD inspection protocols dictate that units are randomly sampled. For a property with $N$ total units, the inspector chooses a subset $n(N)$ based on the tiered sampling schedule defined in Table 1.
 
 | Total Units ($N$) | Inspected Units ($n$) |
 | :--- | :--- |
@@ -94,18 +102,81 @@ HUD inspection protocols dictate that units are sampled without replacement. For
 | 93–110 | 25 |
 | 111+ | 32 |
 
-While the law of large numbers smooths score variance in high-$N$ properties, this sampling process introduces non-negligible variance in mid-sized properties. Because the inspector's subset is stochastic, the recorded defect count $c_{s,\text{Unit}}$ deviates from the true property state $C_{s,\text{Unit}}$, contributing to the overall spread of the final score distribution.
+In massive high-rise properties ($N > 100$), the inspection score tends to be highly stable because extreme outcomes naturally "average out" (Law of Large Numbers). However, for small to mid-sized properties ($N \leq 50$), this random sampling creates much larger relative variations. Because the inspector is pulling a random handful of units, the defects they happen to stumble upon ($c_{s,\text{Unit}}$) can be drastically better or worse than the actual overall condition of the building ($C_{s,\text{Unit}}$). This "luck of the draw" is exactly what drives the wide spread of possible final scores in small to mid-sized properties.
 
 ## 3.2. Realization of Deductions
-Let $I_{u}$ be an indicator variable where $I_u = 1$ if unit $u$ is selected for inspection, and $0$ otherwise. The observed defect count $c_{s,\text{Unit}}$ for a specific simulation realization $\omega$ is defined by the subset of selected units:
+Let $I_{u}$ be an indicator variable for unit $u$, that is, $I_u = 1$ if unit $u$ is selected for inspection, and $0$ otherwise. The observed defect count $c_{s,\text{Unit}}$ for a specific simulation realization $\omega$ is defined by the subset of selected units:
 
 $$c_{s,\text{Unit}}(\omega) = \sum_{u=1}^{N} I_u(\omega) \cdot \mathbb{1}(\text{unit } u \text{ has defect } s)$$
 
-Unlike an expected value approach, our model calculates the realization $D(\omega)$ for each iteration $k$ in the Monte Carlo ensemble. This preserves the variance inherent in the sampling process, which is the primary driver of the "lottery effect" in mid-sized properties.
+The model calculates the realization $D(\omega)$ for each simulation $k$ in the Monte Carlo ensemble. This records the variance, i.e. all observed values, inherent in the sampling process, which is the primary driver of the "lottery effect" in mid-sized properties.
 
 # 4. Resource Mapping and Graph Topology (DAG)
 
-Maintenance tasks form a **Directed Acyclic Graph (DAG)** where each task $i$ is a vertex $V_i$ with an expected execution time $t_i$ and material cost $m_i$.
+In property maintenance, repairs cannot always happen simultaneously or in random order. For example, you cannot paint a wall before patching the drywall, and you cannot patch the drywall before fixing the plumbing leak behind it.
+
+To model this operational reality, we organize maintenance tasks into a Directed Acyclic Graph (DAG). In simpler terms, a DAG is a strict, one-way flowchart that maps out the required "order of operations." Each task (mathematically called a vertex, $V_i$) requires an expected execution time $t_i$ and a material cost $m_i$.
+
+```{mermaid}
+%%| fig-cap: "A simple Directed Acyclic Graph (DAG) illustrating mandatory task sequences."
+flowchart LR
+    A[Fix Plumbing Leak] --> B[Patch Drywall]
+    B --> C[Wait for Compound to Dry]
+    C --> D[Paint Wall]
+    
+    style A fill:#f9f9f9,stroke:#333,stroke-width:2px
+    style B fill:#f9f9f9,stroke:#333,stroke-width:2px
+    style C fill:#ffe6cc,stroke:#d79b00,stroke-width:2px,stroke-dasharray: 5 5
+    style D fill:#f9f9f9,stroke:#333,stroke-width:2px
+```
+
+```{r, fig.width=10, fig.height=8}
+#| echo: false
+#| warning: false
+#| message: false
+
+library(igraph)
+library(RColorBrewer)
+
+# 1. Load the DAG
+dag_csv <- "../inst/extdata/tasks_config.csv"
+dag_obj <- create_inspection_dag(dag_csv)
+g <- dag_obj@graph
+
+# 2. Add Category-based colors
+categories <- dag_obj@tasks_config$category
+cat_levels <- unique(categories)
+cols <- brewer.pal(max(3, length(cat_levels)), "Set3")
+V(g)$color <- cols[match(categories, cat_levels)]
+
+# 3. Size nodes by Betweenness
+V(g)$size <- 8 + (betweenness(g) / max(betweenness(g)) * 15)
+
+# 4. Refined Plotting
+# par(mar) sets margins: c(bottom, left, top, right)
+# Reducing top/bottom margins to expand plot and reduce title-to-plot gap
+par(mar = c(1, 1, 2, 1)) 
+
+plot(
+  g,
+  layout = layout_with_fr(g),
+  vertex.label.cex = 1.5,
+  vertex.label.color = "black",
+  vertex.frame.color = "white",
+  vertex.label.family = "sans",
+  edge.width = 1,
+  edge.arrow.size = 1,
+  main = "", # We will add the title manually to control spacing better
+  xlab = NA, ylab = NA
+)
+
+# Manually add title closer to the graph
+title(main = "Maintenance Tasks DAG", line = 0.5, cex.main = 1.8)
+
+# Legend at bottom left
+legend("bottomleft", legend = cat_levels, col = cols, pch = 21, 
+       pt.bg = cols, cex = 1.6, bty = "n")
+```
 
 ## 4.1. Edge Constraints
 1.  **Sequential Precedence:** A directed edge $V_A \to V_B$ requires the start time of $B$ to be $\ge$ the end time of $A$.

@@ -4,7 +4,7 @@ description: "Starts prep 1 month out, utilizing 2-tech teams with mild synergy.
 staffing:
   num_techs: 5
   hours_per_day: 8
-  max_ot_hours_per_tech: 2      # Fatigue cap
+  max_ot_hours_per_tech: 4      # Fatigue cap
   hourly_rate_internal: 45.00
   overtime_multiplier: 1.50
   efficiency_multiplier: 1.10

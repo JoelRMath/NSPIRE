@@ -405,7 +405,34 @@ While a robust audit catch rate ($\alpha_\text{audit}$) is critical for passing 
 
 To model this operational squeeze, the preparation window ($t_\text{start}$) was swept from 36 days down to 4 days. For this specific scenario, the internal audit catch rate was fixed at a highly effective 85% ($\alpha_\text{audit} = 0.85$), and maximum allowable overtime was expanded to 4 hours per unit per day. Crucially, the simulation incorporates context-aware transit friction: technicians incur small delays (1–5 minutes) when moving between tasks in the same unit, but significant delays (15–30 minutes) when packing up and accessing a new unit.
 
-As the preparation window shrinks, the volume of identified defects remains constant, but the time available to clear them—and the time available to walk between them—compresses. The initial impact is purely financial, as visualized in @fig-time-crunch-labor.
+As the preparation window shrinks, the volume of identified defects remains constant, but the time available to clear them—and the time available to walk between them—compresses. 
+
+```{r}
+#| label: fig-time-crunch-ridges
+#| fig-width: 9
+#| fig-height: 6
+#| echo: false
+#| message: false
+#| warning: false
+#| fig-cap: "Score Distribution Evolution under time compression. Ridges are shown at 4-day intervals for visual clarity."
+
+sweep_data <- load_sensitivity_iterations(here("results", "sensitivity", "t_start"))
+
+# Subset to avoid visual clutter (e.g., plotting every 4 days)
+subset_days <- seq(4, 36, by = 3)
+sweep_data_sub <- sweep_data[as.numeric(sweep_data$param_val) %in% subset_days, ]
+
+# Generate the plot
+plot_sensitivity_ridges(
+  sensitivity_df = sweep_data_sub,
+  param_label = "Days of Notice (t_start)",
+  title = "Time Crunch vs. Score Distribution"
+)
+```
+
+As visualised in @fig-time-crunch-ridges, the score distribution remains stable when $t_\text{start} \geq 28$. However, as time compresses, the distribution stretches heavily to the left before completely fracturing and collapsing into the failure zone.
+
+The initial impact is purely financial, as visualized in @fig-time-crunch-labor.
 
 ```{r}
 #| label: fig-time-crunch-labor
@@ -444,10 +471,30 @@ Between Day 30 and Day 22, the workforce heavily leverages their overtime allowa
 
 plot_sensitivity_multi(
   sum_df_time, 
-  y_vars = c("backlog_prob", "fail_risk_60"),
+  y_vars = c("backlog_prob", "fail_risk_60", "critical_fail_risk_30"),
   param_label = "Days of Notice (t_start)",
   y_label = "Probability",
   title = "The Backlog Cliff: Capacity Exhaustion"
+)
+```
+
+Finally, we map the Tail Drop metric ($\tau$) as a function of the preparation window. This demonstrates how temporal limits affect the volatility of outcomes.
+
+```{r}
+#| label: fig-time-crunch-tau
+#| fig-width: 6
+#| fig-height: 4
+#| echo: false
+#| message: false
+#| warning: false
+#| fig-cap: "Tail Drop Metric $\\tau$ as a function of the preparation window. High $\\tau$ indicates massive outcome volatility."
+
+plot_sensitivity_multi(
+  sum_df_time, 
+  y_vars = c("tail_drop_median"),
+  param_label = "Days of Notice (t_start)",
+  y_label = "Tail Drop Metric",
+  title = "Impact of Prep Window on Tail Drop Metric"
 )
 ```
 
@@ -458,6 +505,187 @@ plot_sensitivity_multi(
 **Maximum Effort Peak ($t_\text{start} \approx 22$)**: Day 22 represents the system's breaking point. Overtime spend reaches its absolute maximum as the team attempts to outwork the shrinking timeline. Despite spending heavily on premium labor, the backlog probability reaches ~50%, and the property begins to exhibit a measurable risk of regulatory failure. The team is throwing maximum capital at the problem but is still losing ground.
 
 **Operational Collapse ($t_\text{start} \leq 15$)**: A standard 14-day HUD notice is mathematically unfeasible for a property in this state and with 5 technicians. By Day 15, the probability of backlogging tasks reaches 100%, and the property's risk of failure exceeds 85%. The simulation proves that sudden drops in preparation expenditure in the days leading up to an inspection are a lagging indicator of capacity exhaustion, representing a forced trade-off of immediate OpEx savings for guaranteed regulatory failure.
+
+
+## 10.3. Prescriptive Analytics: The Staffing Curve
+
+Having established in Section 10.2 that a compressed timeline guarantees regulatory failure due to capacity exhaustion, we can invert the simulation to perform prescriptive analytics. By decoupling the labor constraints from the QA blind spot, we can query the engine: Given a specific preparation window, what is the exact minimum headcount required to guarantee a 99% probability of clearing the known backlog?
+
+Using a binary search algorithm wrapped around the Monte Carlo engine (with $K=1,000$ iterations per step), we mapped the required workforce capacity as the timeline collapses. We targeted a strict operational threshold ($P(\text{Backlog} > 0) \le 0.01$) to ensure the recommended staffing levels are mathematically robust.
+
+```{r}
+#| label: fig-staffing-curve
+#| fig-width: 6
+#| fig-height: 4
+#| echo: false
+#| message: false
+#| warning: false
+#| fig-cap: "Prescriptive Staffing Curve: Minimum technicians required to guarantee $P(\\text{Backlog}) \\le 0.01$ as the inspection window compresses."
+
+# Load the high-resolution staffing curve data
+# Assuming it was saved via: saveRDS(staffing_df, here("results", "sensitivity", "t_start", "staffing_curve.rds"))
+staffing_df <- readRDS(here::here("results", "sensitivity", "t_start", "staffing_curve.rds"))
+
+ggplot2::ggplot(staffing_df, ggplot2::aes(x = t_start, y = required_techs)) +
+  ggplot2::geom_line(color = "#8b0000", linewidth = 1.2, direction = "vh") +
+  ggplot2::geom_point(shape = 21, fill = "white", color = "#8b0000", size = 2, stroke = 1.2) +
+  ggplot2::scale_x_reverse() + # Reverse X-axis so time counts down to the right
+  ggplot2::scale_y_continuous(breaks = scales::pretty_breaks(n = 6)) +
+  ggplot2::theme_minimal(base_size = 14) +
+  ggplot2::labs(
+    title = "Prescriptive Staffing Curve",
+    x = "Days of Notice (t_start)",
+    y = "Required Technicians"
+  ) +
+  ggplot2::theme(
+    panel.grid.minor = ggplot2::element_blank(),
+    plot.title = ggplot2::element_text(face = "bold")
+  )
+```
+
+The resulting curve is highly non-linear. With a generous notice period, the baseline crew of technicians is perfectly adequate to absorb the transit friction and complete the repairs. However, dropping below the 15-day threshold triggers an exponential surge in labor demand. To prep this property in under a week, a property manager cannot simply authorize overtime; they must instantly deploy a massive, coordinated swarm of technicians.
+
+This prescriptive tool translates abstract regulatory timelines directly into actionable HR and budgeting directives, allowing management to definitively calculate the cost of a delayed response.
+
+---
+
+## 10.4. Post-Prep Decay: The "Too Early" Penalty ($t_\text{end}$)
+
+In Section 10.2, we established that compressing the preparation timeline forces a property into a backlog cliff due to labor limits. A common operational response to this risk is to overcompensate by completing all pre-inspection repairs well in advance.
+
+However, residential properties are dynamic, entropic environments subject to continuous wear-and-tear. The time gap between the completion of repairs ($t_\text{end}$) and the actual day of the HUD inspection exposes the property to a natural re-accumulation of defects.
+
+To quantify this temporal decay risk, we swept $t_\text{end}$ from 0 days (repairs finish the morning of the inspection) up to 35 days. To isolate the effect of decay from capacity constraints, the starting notice ($t_\text{start}$) was locked at 45 days, ensuring the team had abundant capacity and zero backlog risk.
+
+@fig-decay-score illustrates the erosion of the property's safety margin as the time gap widens.
+
+```{r}
+#| label: fig-decay-score
+#| fig-width: 6
+#| fig-height: 4
+#| echo: false
+#| message: false
+#| warning: false
+#| fig-cap: "Erosion of the Median and 5th Percentile ($P_{05}$) scores as the gap between prep completion and the inspection date widens."
+
+sum_df_decay <- readRDS(here::here("results", "sensitivity", "t_end", "master_decay_study.rds"))
+
+plot_sensitivity_multi(
+  sum_df_decay, 
+  y_vars = c("score_median", "score_p05"),
+  param_label = "Days Finished Before Inspection (t_end)",
+  y_label = "Score",
+  title = "Impact of Post-Prep Decay on Score Confidence"
+)
+```
+
+As visualized in @fig-decay-score, the score does not degrade at a steady, linear rate. Instead, the property exhibits strong resilience for the first three weeks, maintaining stable median and $P_{05}$ scores up to $t_\text{end} \approx 25$. However, beyond 25 days, the score plunges rapidly. This indicates that temporal decay acts as a threshold effect: accumulating minor wear-and-tear is initially absorbable, but as time passes, the compounding probability of a critical life-safety system (e.g., a smoke detector or GFCI outlet) failing at random reaches a critical mass, shattering the score.
+
+@fig-decay-risk visualizes how this sudden score erosion translates into concrete regulatory failure.
+
+```{r}
+#| label: fig-decay-risk
+#| fig-width: 6
+#| fig-height: 4
+#| echo: false
+#| message: false
+#| warning: false
+#| fig-cap: "The compounding probability of regulatory failure caused by natural property decay during the post-prep waiting period."
+
+plot_sensitivity_multi(
+  sum_df_decay, 
+  y_vars = c("fail_risk_60", "critical_fail_risk_30"),
+  param_label = "Days Finished Before Inspection (t_end)",
+  y_label = "Probability",
+  title = "Failure Risk Amplification over Time"
+)
+```
+
+**Conclusions for $t_\text{end}$**:
+
+**Decay Cliff**: Completing preparations too early introduces severe mathematical risk, manifesting as a "cliff" rather than a steady slope. The data demonstrates that a property remains relatively safe if it sits idle for up to three weeks. However, a property that is highly likely to pass at $t_\text{end} = 0$ exhibits an exponential spike in failure risk if left idle beyond 25 days, reaching near-certain failure by day 35.
+
+**"Goldilocks" Prep Window**: Combined with the capacity insights from Section 10.2, these results define a rigid operational window. A maintenance team must start late enough to avoid an excessive decay penalty ($t_\text{end} \le 25$ days) but early enough to avoid capacity exhaustion ($t_\text{start}$ constraint). Maximizing NSPIRE performance requires precise "just-in-time" repair scheduling.
+
+---
+
+## 10.5. Spatial Heterogeneity and the "Lottery Effect"
+
+NSPIRE scores are heavily influenced by the spatial distribution of defects. HUD's sampling protocol selects a subset of units to represent the entire property (e.g., sampling 20 units in a 50-unit building). While this works mathematically for uniformly maintained properties, it introduces massive variance—the "Lottery Effect"—in properties with severe tenant heterogeneity.
+
+To quantify this, we swept the clean_proportion parameter from 0.50 (highly heterogeneous: 50% normal tenants, 50% highly destructive tenants) up to 1.00 (homogeneous: 100% normal tenants). To isolate the sampling risk, the "destructive" tenants were assigned a severe 5.0x wear-and-tear multiplier, and the internal audit catch rate was fixed at 75%.
+
+@fig-tenant-score visualizes how the introduction of destructive tenants fractures the property's safety margin.
+
+```{r}
+#| label: fig-tenant-score
+#| fig-width: 6
+#| fig-height: 4
+#| echo: false
+#| message: false
+#| warning: false
+#| fig-cap: "Median and 5th Percentile ($P_{05}$) scores as the proportion of clean/normal tenants increases. A highly heterogeneous building (left) exhibits massive tail drop."
+
+sum_df_tenant <- readRDS(here::here("results", "sensitivity", "tenant_mix", "master_tenant_study.rds"))
+
+plot_sensitivity_multi(
+  sum_df_tenant, 
+  y_vars = c("score_median", "score_p05"),
+  param_label = "Proportion of Clean/Normal Tenants",
+  y_label = "Score",
+  title = "Impact of Tenant Heterogeneity on Score Confidence"
+)
+```
+
+As the proportion of clean tenants drops below 85%, the 5th percentile worst-case scenario ($P_{05}$) decouples completely from the median, rapidly plunging toward zero. This decoupling is the direct result of sampling variance, which is best visualized by plotting the standard deviation of the inspection scores (@fig-tenant-variance).
+
+```{r}
+#| label: fig-tenant-variance
+#| fig-width: 6
+#| fig-height: 4
+#| echo: false
+#| message: false
+#| warning: false
+#| fig-cap: "The 'Lottery Effect': Score volatility (Standard Deviation) explodes as the building becomes more heterogeneous."
+
+plot_sensitivity_multi(
+  sum_df_tenant, 
+  y_vars = c("score_sd"),
+  param_label = "Proportion of Clean/Normal Tenants",
+  y_label = "Score Standard Deviation",
+  title = "Score Volatility vs. Tenant Heterogeneity"
+)
+```
+
+@fig-tenant-variance provides mathematical proof of the Lottery Effect. In a homogeneous building (clean_proportion = 1.0), the score is highly predictable (Standard Deviation $\approx 7$). However, in a heterogeneous building (clean_proportion = 0.60), the standard deviation triples to over 21 points.
+
+In this state, the final NSPIRE score is dictated entirely by random chance. If the HUD inspector's random sample happens to bypass the highly destructive units, the property may easily pass. If the sample includes several of them, the heavy penalties (e.g., 60.0 pre-division points for Life-Threatening items) instantly drag the score below 60.
+
+@fig-tenant-risk demonstrates how this volatility translates into regulatory failure.
+
+```{r}
+#| label: fig-tenant-risk
+#| fig-width: 6
+#| fig-height: 4
+#| echo: false
+#| message: false
+#| warning: false
+#| fig-cap: "The probability of regulatory failure as a function of tenant composition."
+
+plot_sensitivity_multi(
+  sum_df_tenant, 
+  y_vars = c("fail_risk_60", "critical_fail_risk_30"),
+  param_label = "Proportion of Clean/Normal Tenants",
+  y_label = "Probability",
+  title = "Failure Risk Driven by High-Impact Tenants"
+)
+```
+
+**Conclusions for Tenant Heterogeneity**:
+
+**Lottery Effect**: Under the NSPIRE scoring protocol, you cannot "average out" a destructive tenant. Because severe defects carry extreme penalty weights, a small cluster of highly degraded units acts as a regulatory landmine.
+
+**Targeted Pre-Inspections**: This proves that treating all units equally during the preparation window is sub-optimal. If management is aware of specific high-impact tenants, those specific units must be audited and repaired at a 100% catch rate prior to the inspection, as they pose a disproportionate mathematical threat to the entire property's score.
 
 ---
 

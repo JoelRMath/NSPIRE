@@ -1,0 +1,35 @@
+task_id,category,description,Studio,1BR_1BA,2BR_1BA,2BR_2BA,3BR_2BA
+FS-01,FS,Smoke Detector,1,2,3,3,4
+FS-02,FS,Carbon Monoxide Detector,1,1,1,1,1
+FS-03,FS,Unit Fire Door Closer,1,1,1,1,1
+FS-04,FS,Unit Fire Door Fit/Latch,1,1,1,1,1
+FS-05,FS,Egress Window,1,2,3,3,4
+EL-01,EL,GFCI Receptacles,2,2,2,3,3
+EL-02,EL,Breaker Box,1,1,1,1,1
+EL-03,EL,Wall Plates & Covers,6,8,10,12,14
+EL-04,EL,Light Fixtures,4,5,6,8,10
+EL-05,EL,Standard Receptacles & Switches,8,10,12,14,16
+PL-01,PL,Kitchen Faucet,1,1,1,1,1
+PL-02,PL,Bathroom Faucet,1,1,1,2,2
+PL-03,PL,Sink Drains / Pop-ups,2,2,2,3,3
+PL-04,PL,Garbage Disposal,1,1,1,1,1
+PL-05,PL,Toilet Base / Stability,1,1,1,2,2
+PL-06,PL,Toilet Tank,1,1,1,2,2
+PL-07,PL,Shower/Tub Hardware,1,1,1,2,2
+PL-08,PL,P-Traps / PVC Rough-in,2,2,2,3,3
+VA-01,VA,Bathroom Exhaust Fan,1,1,1,2,2
+VA-02,VA,Kitchen Range Hood,1,1,1,1,1
+VA-03,VA,Oven / Stove Range,1,1,1,1,1
+VA-04,VA,Refrigerator,1,1,1,1,1
+VA-05,VA,Thermostat,1,1,1,1,1
+DW-01,DW,Interior Doors,2,3,4,5,6
+DW-02,DW,Kitchen Cabinets,1,1,1,1,1
+DW-03,DW,Bathroom Vanity,1,1,1,2,2
+DW-04,DW,Window Screens,2,3,4,4,5
+DW-05,DW,Window Blinds & Shades,2,3,4,4,5
+DW-06,DW,Balcony / Patio Door,1,1,1,1,1
+SU-01,SU,Kitchen Countertop Seams,1,1,1,1,1
+SU-02,SU,Bathroom Tub/Sink Seams,1,1,1,2,2
+SU-03,SU,Drywall & Plaster,1,1,1,1,1
+SU-04,SU,Flooring / Trip Hazards,1,1,1,1,1
+SU-05,SU,Wall Stains / Paint,1,1,1,1,1

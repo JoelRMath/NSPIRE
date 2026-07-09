@@ -195,7 +195,7 @@ study_prep_time <- function(n_iterations = 1000, save_raw = FALSE) {
   cat("          Starting Time Crunch Study                \n")
   cat("\n")
   
-  time_test_values <- seq(36, 4, by = -1)
+  time_test_values <- seq(40, 4, by = -1)
   
   master_summary <- run_sensitivity_analysis(
     sim_env = sim_env,

@@ -1,30 +1,22 @@
-scenario_name: "The Balanced Strategy (30-Day Window)"
-description: "Starts prep 1 month out, utilizing 2-tech teams with mild synergy."
-
-staffing:
-  num_techs: 5
-  hours_per_day: 8
-  max_ot_hours_per_tech: 4      # Fatigue cap
-  hourly_rate_internal: 45.00
-  overtime_multiplier: 1.50
-  efficiency_multiplier: 1.10
-
+scenario_name: "Baseline"
+description: "Standard NSPIRE scenario with expanded overtime"
 temporal_strategy:
-  days_before_inspection: 30          # When the prep cycle begins
-  regular_capacity_hours_per_unit: 10 # Allocated regular hours before OT triggers
-  historical_tickets_lambda: 4.5      # Building average annual tickets per unit
-
+  days_before_inspection: 30
+  regular_capacity_hours_per_unit: 8
+  historical_tickets_lambda: 12
+staffing:
+  techs_per_unit: 1
+  efficiency_multiplier: 1.0
+  hourly_rate_internal: 45.0
+  max_overtime_hours_per_unit: 4  # <-- Bumped from 2 to 4
+  overtime_multiplier: 1.5
 workflow:
-  audit_catch_rate: 0.85              # Probability of catching vendor parts during walk
-  audit_time_mins: 15                 # Labor time spent on the pre-inspection walk
-  category_priority:                  # Tie-breaker for parallel scheduling
-    - "SU"
-    - "PL"
-    - "EL"
-    - "VA"
-    - "FS"
-    - "DW"
-tenant_factors:
-  clean_proportion: 0.80
-  clean_multiplier_mean: 1.0
-  dirty_multiplier_mean: 3.0
+  audit_catch_rate: 0.85
+  friction_intra:
+    min: 2
+    mode: 3
+    max: 5
+  friction_inter:
+    min: 10
+    mode: 15
+    max: 30

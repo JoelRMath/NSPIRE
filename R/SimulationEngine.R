@@ -1,3 +1,4 @@
+library(mc2d)
 
 #' Beta-PERT Random Number Generator (Vectorized)
 #' @export
@@ -136,9 +137,27 @@ schedule_repairs <- function(defects, sim_env, t_prep_days = NULL) {
   # The first task is always a "new unit" dispatch.
   is_new_unit <- c(TRUE, defects$unit_id[-1] != defects$unit_id[-n_tasks])
   
-  # Generate random friction distributions for the entire batch at once
-  friction_intra <- round(rpert(n_tasks, a = 1, m = 3, b = 5))
-  friction_inter <- round(rpert(n_tasks, a = 10, m = 15, b = 30))
+  # # Generate random friction distributions for the entire batch at once
+  # friction_intra <- round(rpert(n_tasks, a = 1, m = 3, b = 5))
+  # friction_inter <- round(rpert(n_tasks, a = 10, m = 15, b = 30))
+  
+  # Extract distribution parameters from scenario with fallbacks
+  f_intra <- scen$workflow$friction_intra
+  f_inter <- scen$workflow$friction_inter
+  
+  friction_intra <- rpert(
+    n = n_tasks, 
+    a = f_intra$min, 
+    m = f_intra$mode, 
+    b = f_intra$max
+  )
+  
+  friction_inter <- rpert(
+    n = n_tasks, 
+    a = f_inter$min, 
+    m = f_inter$mode, 
+    b = f_inter$max
+  )
   
   # Assign friction based on context
   defects$friction_mins <- ifelse(is_new_unit, friction_inter, friction_intra)
@@ -181,5 +200,4 @@ schedule_repairs <- function(defects, sim_env, t_prep_days = NULL) {
   
   return(defects)
 }
-
 `%||%` <- function(a, b) if (!is.null(a)) a else b

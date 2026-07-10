@@ -680,59 +680,51 @@ plot_sensitivity_multi(
 
 ---
 
-## 10.5. Spatial Heterogeneity and the "Lottery Effect"
-
+10.5. Spatial Heterogeneity and the "Lottery Effect"
 NSPIRE scores are heavily influenced by the spatial distribution of defects. HUD's sampling protocol selects a subset of units to represent the entire property (e.g., sampling 20 units in a 50-unit building). While this works mathematically for uniformly maintained properties, it introduces massive variance—the "Lottery Effect"—in properties with severe tenant heterogeneity.
 
-To quantify this, we swept the clean_proportion parameter from 0.50 (highly heterogeneous: 50% normal tenants, 50% highly destructive tenants) up to 1.00 (homogeneous: 100% normal tenants). To isolate the sampling risk, the "destructive" tenants were assigned a severe 5.0x wear-and-tear multiplier, and the internal audit catch rate was fixed at 75%.
+To quantify this, we swept the clean_proportion parameter from 1.00 (homogeneous: 100% normal tenants) down to 0.70. To isolate the sampling risk and ensure we were not artificially degrading the building's overall quality, a dynamic balancing equation was used: as destructive tenants generated more defects, standard units became proportionally cleaner. Destructive units were assigned a catastrophic 20.0x severity ratio to simulate true "landmine" tenants (e.g., hoarding, active destruction).
 
-@fig-tenant-score visualizes how the introduction of destructive tenants fractures the property's safety margin.
+@fig-tenant-physics visualizes the physical state of the building prior to HUD scoring.
 
 ```{r}
-#| label: fig-tenant-score
-#| fig-width: 6
+master_tenant_study <- readRDS(here::here("results", "sensitivity", "tenant_mix", "master_tenant_study.rds"))
+```
+
+```{r}
+#| label: fig-tenant-physics
+#| layout-ncol: 2
+#| fig-width: 5
 #| fig-height: 4
 #| echo: false
 #| message: false
 #| warning: false
-#| fig-cap: "Median and 5th Percentile ($P_{05}$) scores as the proportion of clean/normal tenants increases. A highly heterogeneous building (left) exhibits massive tail drop."
+#| fig-cap: "The Physical Reality of Heterogeneity. As the proportion of clean tenants decreases (left), the total number of defects drops due to physical limits (Plot A), but the spatial clustering increases dramatically (Plot B)."
 
-sum_df_tenant <- readRDS(here::here("results", "sensitivity", "tenant_mix", "master_tenant_study.rds"))
 
-plot_sensitivity_multi(
-  sum_df_tenant, 
-  y_vars = c("score_median", "score_p05"),
-  param_label = "Proportion of Clean/Normal Tenants",
-  y_label = "Score",
-  title = "Impact of Tenant Heterogeneity on Score Confidence"
+
+# Plot A: Total Defects
+plot_sensitivity_metric(
+  master_tenant_study,
+  y_var = "avg_total_defects",
+  param_label = "Proportion of Clean Tenants",
+  y_label = "Total Building Defects",
+  title = "A: Conservation of Defects"
+)
+
+# Plot B: Clustering
+plot_sensitivity_metric(
+  master_tenant_study,
+  y_var = "avg_clustering_sd",
+  param_label = "Proportion of Clean Tenants",
+  y_label = "Standard Deviation per Unit",
+  title = "B: Spatial Clustering Spike"
 )
 ```
 
-As the proportion of clean tenants drops below 85%, the 5th percentile worst-case scenario ($P_{05}$) decouples completely from the median, rapidly plunging toward zero. This decoupling is the direct result of sampling variance, which is best visualized by plotting the standard deviation of the inspection scores (@fig-tenant-variance).
+The data reveals a powerful statistical paradox. As the proportion of clean tenants decreases, the total volume of defects in the building actually drops (due to the physical maximum cap on defects a single unit can harbor). However, the standard deviation of defects per unit quadruples. The defects are highly clustered into a few disastrous units.
 
-```{r}
-#| label: fig-tenant-variance
-#| fig-width: 6
-#| fig-height: 4
-#| echo: false
-#| message: false
-#| warning: false
-#| fig-cap: "The 'Lottery Effect': Score volatility (Standard Deviation) explodes as the building becomes more heterogeneous."
-
-plot_sensitivity_multi(
-  sum_df_tenant, 
-  y_vars = c("score_sd"),
-  param_label = "Proportion of Clean/Normal Tenants",
-  y_label = "Score Standard Deviation",
-  title = "Score Volatility vs. Tenant Heterogeneity"
-)
-```
-
-@fig-tenant-variance provides mathematical proof of the Lottery Effect. In a homogeneous building (clean_proportion = 1.0), the score is highly predictable (Standard Deviation $\approx 7$). However, in a heterogeneous building (clean_proportion = 0.60), the standard deviation triples to over 21 points.
-
-In this state, the final NSPIRE score is dictated entirely by random chance. If the HUD inspector's random sample happens to bypass the highly destructive units, the property may easily pass. If the sample includes several of them, the heavy penalties (e.g., 60.0 pre-division points for Life-Threatening items) instantly drag the score below 60.
-
-@fig-tenant-risk demonstrates how this volatility translates into regulatory failure.
+@fig-tenant-risk demonstrates how this physical clustering translates into regulatory failure.
 
 ```{r}
 #| label: fig-tenant-risk
@@ -741,22 +733,24 @@ In this state, the final NSPIRE score is dictated entirely by random chance. If 
 #| echo: false
 #| message: false
 #| warning: false
-#| fig-cap: "The probability of regulatory failure as a function of tenant composition."
+#| fig-cap: "The 'Lottery Effect' on Regulatory Risk. Despite having fewer overall defects, buildings with highly concentrated tenant damage experience a massive spike in inspection failure probability."
 
 plot_sensitivity_multi(
-  sum_df_tenant, 
+  master_tenant_study, 
   y_vars = c("fail_risk_60", "critical_fail_risk_30"),
-  param_label = "Proportion of Clean/Normal Tenants",
-  y_label = "Probability",
-  title = "Failure Risk Driven by High-Impact Tenants"
+  param_label = "Proportion of Clean Tenants",
+  y_label = "Probability of Failure",
+  title = "Failure Risk vs. Tenant Heterogeneity"
 )
 ```
 
-**Conclusions for Tenant Heterogeneity**:
+Despite the heterogeneous building containing fewer total defects than the homogeneous baseline, its probability of regulatory failure nearly quintuples (from 2.4% to over 11.4%).
 
-**Lottery Effect**: Under the NSPIRE scoring protocol, you cannot "average out" a destructive tenant. Because severe defects carry extreme penalty weights, a small cluster of highly degraded units acts as a regulatory landmine.
+Conclusions for Tenant Heterogeneity:
 
-**Targeted Pre-Inspections**: This proves that treating all units equally during the preparation window is sub-optimal. If management is aware of specific high-impact tenants, those specific units must be audited and repaired at a 100% catch rate prior to the inspection, as they pose a disproportionate mathematical threat to the entire property's score.
+The Lottery Effect is Real: Under the NSPIRE scoring protocol, you cannot "average out" a destructive tenant. Because HUD's divisor is based on the sample size, stepping into just one or two heavily concentrated units will instantly drag an otherwise pristine property below a passing score.
+
+Targeted Pre-Inspections: A property with fewer total defects but high clustering is statistically more dangerous than a uniformly degraded property. If management is aware of specific high-impact tenants, those specific units must be audited and repaired at a 100% catch rate prior to the inspection, as they pose a disproportionate mathematical threat.
 
 ---
 

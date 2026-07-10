@@ -26,7 +26,6 @@ generate_building <- function(sim_env, total_units) {
   sample(x = archetypes, size = total_units, replace = TRUE, prob = probs)
 }
 
-
 #' Run NSPIRE Inspection Simulation
 #' @export
 run_simulation <- function(sim_env, total_units = 100, seed = NULL) {
@@ -36,14 +35,24 @@ run_simulation <- function(sim_env, total_units = 100, seed = NULL) {
   scen <- sim_env@scenario
   
   clean_prop <- scen$tenant_factors$clean_proportion %||% 0.80
-  clean_mean <- scen$tenant_factors$clean_multiplier_mean %||% 1.0
-  dirty_mean <- scen$tenant_factors$dirty_multiplier_mean %||% 3.0
+  
+  # NEW: Use a ratio instead of hardcoded absolute means
+  severity_ratio <- scen$tenant_factors$dirty_severity_ratio %||% 5.0
+  
+  # NEW: Dynamically balance the means to enforce Conservation of Defects
+  clean_mean <- 1.0 / (clean_prop + severity_ratio * (1 - clean_prop))
+  dirty_mean <- clean_mean * severity_ratio
   
   is_clean <- stats::runif(total_units) <= clean_prop
   tenant_factors <- numeric(total_units)
   
-  if(any(is_clean)) tenant_factors[is_clean] <- pmax(0.1, stats::rnorm(sum(is_clean), mean = clean_mean, sd = 0.2))
-  if(any(!is_clean)) tenant_factors[!is_clean] <- pmax(1.0, stats::rnorm(sum(!is_clean), mean = dirty_mean, sd = 0.5))
+  # NEW: Scale SDs proportionally to prevent pmax() from biasing the global mean
+  if(any(is_clean)) {
+    tenant_factors[is_clean] <- pmax(0.01, stats::rnorm(sum(is_clean), mean = clean_mean, sd = 0.2 * clean_mean))
+  }
+  if(any(!is_clean)) {
+    tenant_factors[!is_clean] <- pmax(0.01, stats::rnorm(sum(!is_clean), mean = dirty_mean, sd = 0.2 * dirty_mean))
+  }
   
   units_df <- data.frame(
     unit_id = paste0("Unit_", seq_along(building_units)),
@@ -85,6 +94,7 @@ run_simulation <- function(sim_env, total_units = 100, seed = NULL) {
   unit_nums <- as.numeric(gsub("Unit_", "", results_df$unit_id))
   results_df <- results_df[order(unit_nums, results_df$task_id), ]
   rownames(results_df) <- NULL
+  
   return(results_df)
 }
 

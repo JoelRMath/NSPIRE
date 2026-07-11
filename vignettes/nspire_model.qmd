@@ -680,10 +680,21 @@ plot_sensitivity_multi(
 
 ---
 
-10.5. Spatial Heterogeneity and the "Lottery Effect"
+## 10.5. Spatial Heterogeneity and the "Lottery Effect"
+
 NSPIRE scores are heavily influenced by the spatial distribution of defects. HUD's sampling protocol selects a subset of units to represent the entire property (e.g., sampling 20 units in a 50-unit building). While this works mathematically for uniformly maintained properties, it introduces massive variance—the "Lottery Effect"—in properties with severe tenant heterogeneity.
 
-To quantify this, we swept the clean_proportion parameter from 1.00 (homogeneous: 100% normal tenants) down to 0.70. To isolate the sampling risk and ensure we were not artificially degrading the building's overall quality, a dynamic balancing equation was used: as destructive tenants generated more defects, standard units became proportionally cleaner. Destructive units were assigned a catastrophic 20.0x severity ratio to simulate true "landmine" tenants (e.g., hoarding, active destruction).
+To quantify this, we varied the clean_proportion parameter from 1.00 (homogeneous: 100% normal tenants) down to 0.70. To isolate the sampling risk and ensure we were not artificially degrading the building's overall quality, a dynamic balancing equation was used. We enforced a strict "Conservation of Defects" by fixing the global expected severity multiplier at 1.0. 
+
+Let $p$ be the proportion of clean units and $R$ be the severity ratio of a destructive unit (set to $20.0$). The expected defect multipliers for clean units ($\mu_c$) and destructive units ($\mu_d$) must satisfy:
+
+$$p \mu_c + (1 - p) \mu_d = 1.0$$
+
+By substituting $\mu_d = R \mu_c$, we dynamically calculate the baseline multiplier for the clean units for any given tenant mixture:
+
+$$\mu_c = \frac{1}{p + R(1 - p)}$$
+
+Consequently, as destructive tenants are introduced and generate severe defect clusters, standard units become proportionally cleaner to offset them.
 
 @fig-tenant-physics visualizes the physical state of the building prior to HUD scoring.
 
@@ -699,9 +710,10 @@ master_tenant_study <- readRDS(here::here("results", "sensitivity", "tenant_mix"
 #| echo: false
 #| message: false
 #| warning: false
-#| fig-cap: "The Physical Reality of Heterogeneity. As the proportion of clean tenants decreases (left), the total number of defects drops due to physical limits (Plot A), but the spatial clustering increases dramatically (Plot B)."
-
-
+#| fig-cap: "The Physical Reality of Heterogeneity. As the building becomes more homogeneous (moving left to right), the spatial clustering of defects collapses (Plot B). The U-shape in total defects (Plot A) reveals the physical capacity limits of individual units."
+#| fig-subcap: 
+#|   - "Conservation of Defects"
+#|   - "Spatial Clustering Spike"
 
 # Plot A: Total Defects
 plot_sensitivity_metric(
@@ -717,12 +729,16 @@ plot_sensitivity_metric(
   master_tenant_study,
   y_var = "avg_clustering_sd",
   param_label = "Proportion of Clean Tenants",
-  y_label = "Standard Deviation per Unit",
+  y_label = "Standard Deviation of Unit Defect Count",
   title = "B: Spatial Clustering Spike"
 )
 ```
 
-The data reveals a powerful statistical paradox. As the proportion of clean tenants decreases, the total volume of defects in the building actually drops (due to the physical maximum cap on defects a single unit can harbor). However, the standard deviation of defects per unit quadruples. The defects are highly clustered into a few disastrous units.
+The data reveals a statistical paradox driven by physical constraints (Plot A). As the proportion of clean tenants increases (left to right), the balancing equation forces a shrinking number of destructive units to carry the mathematical burden. These few units quickly hit a physical ceiling—a single apartment can only harbor so many broken items. Consequently, excess theoretical defects are truncated, artificially dropping the building's total defect count. 
+
+Once $p$ pushes past $0.94$, the burden shifts back to the clean units, which can easily absorb the expected defects without truncation, allowing the total volume to rapidly rebound to its theoretical expectation. 
+
+Crucially, the SD of defect count per unit (Plot B) peaks before collapsing. This peak represents the maximum disparity between clean and destructive units. Beyond this threshold, building-wide variance plummets due to two intertwined factors: a shrinking population of destructive units to act as outliers, and physical item caps that prevent those remaining units from absorbing extreme defect multipliers.
 
 @fig-tenant-risk demonstrates how this physical clustering translates into regulatory failure.
 
@@ -744,7 +760,7 @@ plot_sensitivity_multi(
 )
 ```
 
-Despite the heterogeneous building containing fewer total defects than the homogeneous baseline, its probability of regulatory failure nearly quintuples (from 2.4% to over 11.4%).
+Despite the heterogeneous building containing fewer total defects than the homogeneous baseline, its probability of regulatory failure more than doubles (from 8.6% to 19).
 
 Conclusions for Tenant Heterogeneity:
 

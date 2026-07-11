@@ -64,6 +64,10 @@ plot_data <- tidyr::pivot_longer(
   values_to = "Total_Hours"
 )
 
+save_dir <- here::here("results", "transit_friction")
+if(!dir.exists(save_dir)) dir.create(save_dir, recursive = TRUE)
+saveRDS(plot_data,file.path(save_dir, "friction_plot.rds"))
+
 # 4. Generate Density Plot
 p <- ggplot(plot_data, aes(x = Total_Hours, fill = Scenario, color = Scenario)) +
   geom_density(alpha = 0.6, linewidth = 1) +

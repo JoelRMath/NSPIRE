@@ -49,7 +49,7 @@ for (cp in clean_prop_values) {
       sim_env = temp_env,
       score_csv = score_csv,
       total_units = 50,
-      audit_catch_rate = 0.72, 
+      audit_catch_rate = 0.75, 
       t_start = 30,
       t_end = 5,
       save_raw = TRUE  

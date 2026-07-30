@@ -1196,6 +1196,117 @@ workflow:
 ```
 ````
 
+# Appendix B: R code
+
+## Simulator code
+
+```{mermaid}
+%%| fig-cap: "Architecture of the NSPIRE Simulation Framework"
+
+%%{init: {'theme': 'base', 'themeVariables': {'background': '#ffffff', 'clusterBkg': '#f8f9fa', 'clusterBorder': '#b0bec5', 'primaryTextColor': '#000000', 'lineColor': '#555555', 'edgeLabelBackground': '#f9fbe7', 'tertiaryTextColor': '#000000'}}}%%
+
+graph TD
+    %% Define S4 Classes
+    subgraph OOP [S4 Data Structures]
+        DAG["<b>InspectionDAG</b><br>Mathematical Graph & Tasks"]
+        ENV["<b>InspectionSimulation</b><br>Complete Scenario Environment"]
+        ENV ==>|"Contains"| DAG
+    end
+
+    %% Define Core Engine
+    subgraph Engine [Simulation Engine]
+        MC("<b>run_monte_carlo</b><br><i>Master Orchestrator</i>")
+        
+        SIM("<b>run_simulation</b><br><i>Defect Generation</i>")
+        SCHED("<b>schedule_repairs</b><br><i>Routing & Finance</i>")
+        AUDIT("<b>apply_audit_fixes</b><br><i>Quality Control</i>")
+        SCORE("<b>calculate_inspection_score</b><br><i>HUD Deductions</i>")
+
+        MC -->|"1. Executes"| SIM
+        MC -->|"2. Passes raw defects to"| SCHED
+        MC -->|"3. Passes schedule to"| AUDIT
+        MC -->|"4. Passes fixed defects to"| SCORE
+    end
+
+    %% Define Interactions
+    SIM -.->|"Reads Unit Mix & Task Topology"| ENV
+    SCHED -.->|"Reads Transit Friction & Capacity"| ENV
+    
+    %% Explicitly Style Subgraphs
+    style OOP fill:#ffffff,stroke:#cccccc,stroke-width:2px,color:#000000
+    style Engine fill:#ffffff,stroke:#cccccc,stroke-width:2px,color:#000000
+
+    %% Explicitly Style Nodes to prevent text wash-out
+    style DAG fill:#e1f5fe,stroke:#0288d1,stroke-width:2px,color:#000000
+    style ENV fill:#e1f5fe,stroke:#0288d1,stroke-width:2px,color:#000000
+    style MC fill:#fff3e0,stroke:#f57c00,stroke-width:2px,color:#000000
+    style SIM fill:#f5f5f5,stroke:#9e9e9e,stroke-width:1px,color:#000000
+    style SCHED fill:#f5f5f5,stroke:#9e9e9e,stroke-width:1px,color:#000000
+    style AUDIT fill:#f5f5f5,stroke:#9e9e9e,stroke-width:1px,color:#000000
+    style SCORE fill:#f5f5f5,stroke:#9e9e9e,stroke-width:1px,color:#000000
+
+    %% Explicitly Style Links (Edges) to force black text
+    linkStyle default stroke:#555555,stroke-width:1px,color:#000000
+```
+
+
+```{r}
+#| label: tbl-scripts
+#| tbl-cap: "NSPIRE Simulator R Scripts and Architecture Roles"
+#| echo: false
+#| message: false
+#| warning: false
+
+library(knitr)
+
+scripts_df <- data.frame(
+  `Script Name` = c(
+    "InspectionDAG.R", 
+    "InspectionSimulation.R", 
+    "SimulationEngine.R", 
+    "ScoringEngine.R", 
+    "MonteCarloWrapper.R", 
+    "Tools.R", 
+    "SensitivityAnalysis.R", 
+    "Decay.R", 
+    "TenantMix.R", 
+    "RunSolver.R", 
+    "Transit.R"
+  ),
+  `Architecture Role` = c(
+    "S4 Data Structure", 
+    "S4 Data Structure", 
+    "Core Engine", 
+    "Core Engine", 
+    "Core Engine", 
+    "Operational Logic", 
+    "Analysis Suite", 
+    "Execution Script", 
+    "Execution Script", 
+    "Execution Script", 
+    "Execution Script"
+  ),
+  `Description` = c(
+    "Defines the mathematical graph, ensuring physical prerequisites and task dependencies are rigidly enforced.",
+    "The operational wrapper that combines the DAG, physical floorplans, and YAML constraints into a complete, pre-calculated environment.",
+    "The physics and logistics module; handles Beta-PERT stochastic times, defect generation, and context-aware scheduling/transit friction.",
+    "The regulatory filter; applies internal quality control (audit catch rates), HUD random sampling protocols, and final score deductions.",
+    "The master orchestrator that loops the execution sequence (Generation -> Scheduling -> Audit -> Scoring) across thousands of iterations.",
+    "Houses the prescriptive find_required_capacity binary search algorithm, decoupling labor limits from scoring to strictly target backlog probability.",
+    "The dispatcher and observables calculator; extracts comprehensive distribution metrics (e.g., tail drops, costs) when sweeping parameters like audit rate or prep time.",
+    "Maps the exponential failure risk of the 'Too Early' penalty by sweeping the post-prep idle window (t_end).",
+    "A high-volume (100k iteration) batched script designed to stabilize extreme tail metrics and quantify the spatial clustering 'Lottery Effect.'",
+    "Inverts the simulation to answer prescriptive staffing questions, calling the binary search tool to map required labor against a shrinking timeline.",
+    "Executes paired simulations to quantify the 34% 'Operational Reality Gap', comparing frictionless ideal execution against realistic ground execution."
+  ),
+  check.names = FALSE,
+  stringsAsFactors = FALSE
+)
+
+kable(scripts_df, align = c('l', 'l', 'l'))
+```
+
+
 <style>
 .floating-copyright {
   position: fixed;

@@ -1,9 +1,9 @@
-#' Post-Prep Decay Sensitivity Sweep (t_end)
+#' Post-Prep Decay Sensitivity (t_end)
 #'
 #' This execution script investigates the "Too Early" penalty.
 #' It quantifies the stochastic re-emergence of defects when a property sits idle 
 #' in the time gap between the completion of repairs (t_end) and the actual HUD inspection.
-#' By executing this script, we map the exact threshold where natural entropic 
+#' By executing this script, we estimate the threshold where natural entropic 
 #' decay begins to trigger regulatory failure.
 
 # ==========================================
@@ -34,9 +34,9 @@ cat("\n=== Starting Post-Prep Decay Sweep ===\n")
 
 # Note: We lock t_start at 45 to ensure the team has PLENTY of time 
 # to fix things, completely isolating the 'decay' effect from the 'backlog' effect.
-# By forcing a massive 45-day prep window, we mathematically guarantee that 
-# labor capacity is never exhausted. Therefore, any failures observed here are 
-# strictly the result of post-prep asset decay, not abandoned work.
+# This also guarantees that labor capacity is never exhausted. 
+# Therefore, any failures observed here are strictly the result of 
+# post-prep asset decay, not abandoned work.
 decay_summary <- run_sensitivity_analysis(
   sim_env = sim_env,
   score_csv = score_csv,

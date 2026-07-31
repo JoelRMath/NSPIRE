@@ -4,20 +4,29 @@
 
 #' Plot Monte Carlo Score Distribution
 #'
-#' @param input Path to a score_density_*.rds file.
-#' @param title Character.
-#' @param color_hex Character. The exact hex color to fill.
-#' @param failure_threshold Numeric.
+#' Renders a density plot for a single parameter state's final NSPIRE scores. 
+#' It visually splits the area under the curve to highlight the probability of 
+#' falling below the regulatory failure threshold.
+#'
+#' @param input Character. Path to a cached `score_density_*.rds` object.
+#' @param title Character. The plot title.
+#' @param color_hex Character. The exact hex color to fill the passing region.
+#' @param failure_threshold Numeric. The score below which enforcement actions trigger (default: 60).
+#' @return A ggplot object.
 #' @export
 plot_score_distribution <- function(input, title = "NSPIRE Score Distribution", color_hex = "#5292f9", failure_threshold = 60) {
   
+  # Load the pre-calculated density object (extracted during the sensitivity sweep)
   dens_obj <- readRDS(input)
   plot_df <- data.frame(x = dens_obj$x, y = dens_obj$y)
   
   ggplot2::ggplot(plot_df, ggplot2::aes(x = x, y = y)) +
+    # Highlight the failure tail in red
     ggplot2::geom_area(data = subset(plot_df, x < failure_threshold), fill = "#b3261e", alpha = 0.4) +
+    # Fill the passing region with the specified color
     ggplot2::geom_area(fill = color_hex, alpha = 0.6) +
     ggplot2::geom_line(color = "black", linewidth = 0.5) +
+    # Draw the strict regulatory threshold line
     ggplot2::geom_vline(xintercept = failure_threshold, linetype = "dashed", color = "#b3261e", linewidth = 0.8) +
     ggplot2::labs(title = title, x = "Final NSPIRE Score", y = "Density") +
     ggplot2::theme_minimal() +
@@ -29,66 +38,15 @@ plot_score_distribution <- function(input, title = "NSPIRE Score Distribution", 
       plot.background = ggplot2::element_rect(color = "gray", fill = NA, linewidth = 0.5)
     )
 }
-#' Plot Sensitivity Ridgeline (Joyplot)
-#'
-#' Generates an overlapping density (ridgeline) plot to visualize the
-#' distribution of scores across different sensitivity parameter values.
-#'
-#' @param sensitivity_df A data.frame containing raw iteration results.
-#' @param param_label Character. The label for the Y-axis.
-#' @param title Character. The plot title.
-#' @param failure_threshold Numeric. The score below which enforcement actions trigger.
-#' @export
-plot_sensitivity_ridges <- function(sensitivity_df, param_label = "Parameter Value",
-                                    title = "Sensitivity Analysis: Score Distributions",
-                                    failure_threshold = 60) {
-  
-  # Ensure required external plotting packages are available
-  
-  if (!requireNamespace("ggplot2", quietly = TRUE) ||
-      !requireNamespace("ggridges", quietly = TRUE) ||
-      !requireNamespace("viridis", quietly = TRUE)) {
-    stop("Packages 'ggplot2', 'ggridges', and 'viridis' are required. Run: install.packages(c('ggplot2', 'ggridges', 'viridis'))")
-  }
-  
-  # Convert param_val to a factor to ensure discrete Y-axis steps.
-  
-  sensitivity_df$param_factor <- factor(sensitivity_df$param_val,
-                                        levels = sort(unique(sensitivity_df$param_val)))
-  
-  # Build the joyplot
-  
-  p <- ggplot2::ggplot(sensitivity_df,
-                       ggplot2::aes(x = score, y = param_factor, fill = ggplot2::after_stat(x))) +
-    ggridges::geom_density_ridges_gradient(scale = 3, rel_min_height = 0.01,
-                                           color = "white", linewidth = 0.3) +
-    viridis::scale_fill_viridis_c(name = "Score", option = "viridis", direction = 1,
-                                  limits = c(0, 100)) +
-    ggplot2::geom_vline(xintercept = failure_threshold, color = "red",
-                        linetype = "dashed", linewidth = 1) +
-    ggridges::theme_ridges(font_size = 11, grid = TRUE) +
-    ggplot2::labs(
-      title = title,
-      x = "Final NSPIRE Score",
-      y = param_label
-    ) +
-    ggplot2::theme(
-      legend.position = "right",
-      axis.title.y = ggplot2::element_text(hjust = 0.5, face = "bold", margin = ggplot2::margin(r = 10)),
-      axis.title.x = ggplot2::element_text(hjust = 0.5, face = "bold", margin = ggplot2::margin(t = 10)),
-      plot.title = ggplot2::element_text(hjust = 0.5, face = "bold")
-    )
-  
-  return(p)
-}
 
 #' Compile Sensitivity Iterations
 #'
-#' Helper function to load and bind all summary_[val].rds files from a sensitivity sweep
-#' into a single dataframe for ridgeline plotting.
+#' Helper function to load and vertically bind all individual `summary_[val].rds` files 
+#' generated during a sensitivity sweep. This aggregates the data required for 
+#' building the ridgeline/joyplots.
 #'
-#' @param base_dir Character. Path to the sensitivity results folder.
-#' @return A data.frame with a param_val column.
+#' @param base_dir Character. Path to the folder containing the summary RDS files.
+#' @return A master \code{data.frame} containing all scores tagged with their \code{param_val}.
 #' @export
 load_sensitivity_iterations <- function(base_dir) {
   
@@ -97,7 +55,7 @@ load_sensitivity_iterations <- function(base_dir) {
   if (length(files) == 0) stop("No summary files found in the specified directory.")
   
   df_list <- lapply(files, function(f) {
-    # Extract the numerical parameter value using fixed string replacements
+    # Extract the numerical parameter value from the filename using string replacement
     val_str <- basename(f)
     val_str <- gsub("summary_", "", val_str, fixed = TRUE)
     val_str <- gsub(".rds", "", val_str, fixed = TRUE)
@@ -110,23 +68,30 @@ load_sensitivity_iterations <- function(base_dir) {
   return(do.call(rbind, df_list))
 }
 
-#' Plot Sensitivity Ridgelines
+#' Plot Sensitivity Ridgelines (Robust)
 #'
-#' Generates a joyplot/ridgeline plot showing score distributions across parameter values.
+#' Generates an overlapping density (ridgeline) plot showing score distributions 
+#' shifting across parameter values. Includes robust factor sorting to guarantee 
+#' the Y-axis cascades in the correct numerical order.
 #'
-#' @param sensitivity_df A data.frame generated by load_sensitivity_iterations.
-#' @param param_label Character. Label for the y-axis (the parameter).
+#' @param sensitivity_df A \code{data.frame} generated by load_sensitivity_iterations.
+#' @param param_label Character. Label for the Y-axis (the parameter being swept).
 #' @param title Character. Title of the plot.
 #' @return A ggplot object.
 #' @export
 plot_sensitivity_ridges <- function(sensitivity_df, param_label = "Parameter Value", title = "Score Distribution Shift") {
   
-  sensitivity_df$param_val <- as.factor(sensitivity_df$param_val)
+  # Protect the Y-axis order by explicitly sorting the factor levels numerically
+  sensitivity_df$param_val <- factor(
+    sensitivity_df$param_val, 
+    levels = sort(unique(sensitivity_df$param_val))
+  )
   
   ggplot2::ggplot(sensitivity_df, ggplot2::aes(x = score, y = param_val, fill = ggplot2::after_stat(x))) +
     ggridges::geom_density_ridges_gradient(scale = 3, rel_min_height = 0.01) +
-    # Use ggplot2's built-in viridis scale
+    # Use ggplot2's built-in viridis scale with the "plasma" option (Yellow-Orange-Purple)
     ggplot2::scale_fill_viridis_c(name = "Score", option = "plasma", limits = c(0, 100)) +
+    # Hardcode the regulatory failure threshold line
     ggplot2::geom_vline(xintercept = 60, linetype = "dashed", color = "red", linewidth = 1) +
     ggplot2::scale_x_continuous(limits = c(0, 100)) +
     ggplot2::labs(
@@ -143,14 +108,15 @@ plot_sensitivity_ridges <- function(sensitivity_df, param_label = "Parameter Val
     )
 }
 
-#' Plot Sensitivity Metric
+#' Plot Single Sensitivity Metric
 #'
-#' Generic plotter for sensitivity metrics.
+#' Generic line-and-point plotter for visualizing how a single numerical 
+#' observable (e.g., total defects) responds to a changing parameter.
 #'
-#' @param sensitivity_df A summary data.frame.
-#' @param y_var Character. The column name in the df to plot on the Y-axis.
-#' @param param_label Character. Label for X-axis.
-#' @param y_label Character. Label for Y-axis.
+#' @param sensitivity_df A summary \code{data.frame}.
+#' @param y_var Character. The column name in the dataframe to map to the Y-axis.
+#' @param param_label Character. Label for the X-axis.
+#' @param y_label Character. Label for the Y-axis.
 #' @param title Character. Plot title.
 #' @return A ggplot object.
 #' @export
@@ -173,17 +139,23 @@ plot_sensitivity_metric <- function(sensitivity_df, y_var, param_label = "Parame
     )
 }
 
-#' Plot Multiple Sensitivity Metrics with Consistent Semantic Colors
+#' Plot Multiple Sensitivity Metrics (Semantic Palette)
 #'
-#' @param sensitivity_df A summary data.frame.
-#' @param y_vars Character vector. Column names to plot.
-#' @param param_label Character. Label for X-axis.
-#' @param y_label Character. Label for Y-axis.
+#' Plots multiple observables on the same Y-axis (e.g., mean cost and max cost). 
+#' It strictly enforces a predefined semantic color palette to ensure visual 
+#' consistency across the entire Quarto report (e.g., Risk is always red, 
+#' Finance is always purple, Scores are always blue).
+#'
+#' @param sensitivity_df A summary \code{data.frame}.
+#' @param y_vars Character vector. The column names to plot simultaneously.
+#' @param param_label Character. Label for the X-axis.
+#' @param y_label Character. Label for the Y-axis.
 #' @param title Character. Plot title.
+#' @return A ggplot object.
 #' @export
 plot_sensitivity_multi <- function(sensitivity_df, y_vars, param_label = "Parameter", y_label = "Value", title = "") {
   
-  # The Semantic Palette
+  # Master Semantic Palette ensuring consistency across all report figures
   manual_colors <- c(
     # --- Scores (Blues: Dark = Median, Medium = Mean, Light = Percentiles) ---
     "score_median" = "#041e49", "score_mean" = "#0b57d0", "score_sd" = "#5292f9",
@@ -192,7 +164,7 @@ plot_sensitivity_multi <- function(sensitivity_df, y_vars, param_label = "Parame
     "score_p25" = "#80a8f9", "score_p75" = "#80a8f9", "score_p90" = "#a8c7fa",
     "score_p95" = "#aec9f9", "score_p99" = "#aec9f9",
     
-    # --- Risk (Reds: Dark = Critical, Medium = Standard) ---
+    # --- Risk (Reds: Dark = Critical, Medium = Standard, Greens for Tail Drop) ---
     "fail_risk_60" = "#b3261e", "critical_fail_risk_30" = "#601410",
     "tail_drop_median" = "#146c2e", "tail_drop_mean" = "#6dd58c",
     
@@ -211,21 +183,25 @@ plot_sensitivity_multi <- function(sensitivity_df, y_vars, param_label = "Parame
     "backlog_mean" = "#8d6e63", "backlog_median" = "#a1887f", 
     "backlog_p95" = "#bcaaa4", "backlog_prob" = "#d7ccc8"
   )
+  
+  # Fallback handler to prevent crashes if an undocumented metric is passed
   unknown_vars <- setdiff(y_vars, names(manual_colors))
   if(length(unknown_vars) > 0) {
     warning("Unmapped variables detected: ", paste(unknown_vars, collapse=", "))
     manual_colors <- c(manual_colors, setNames(rep("#cccccc", length(unknown_vars)), unknown_vars))
   }
   
+  # Reshape wide metrics to long format for ggplot grouped lines
   df_long <- sensitivity_df %>%
-    tidyr::pivot_longer(cols = all_of(y_vars), names_to = "metric", values_to = "value")
+    tidyr::pivot_longer(cols = dplyr::all_of(y_vars), names_to = "metric", values_to = "value")
   
-  # Ensure the order of factors matches the input to keep legend stable
+  # Ensure the order of factors matches the input to keep the legend stable
   df_long$metric <- factor(df_long$metric, levels = y_vars)
   
   ggplot2::ggplot(df_long, ggplot2::aes(x = param_val, y = value, color = metric)) +
     ggplot2::geom_line(linewidth = 1.2) +
     ggplot2::geom_point(shape = 21, fill = "white", size = 2, stroke = 1) +
+    # Apply the semantic palette
     ggplot2::scale_color_manual(values = manual_colors, guide = ggplot2::guide_legend(title = "Metric")) +
     ggplot2::labs(title = title, x = param_label, y = y_label) +
     ggplot2::theme_minimal() +

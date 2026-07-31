@@ -1,12 +1,12 @@
-#' Spatial Heterogeneity & The Lottery Effect Sweep
+#' Spatial Heterogeneity & The Lottery Effect 
 #'
-#' This high-volume execution script investigates the "Lottery Effect" under NSPIRE's 
+#' Execution script: investigates the "Lottery Effect" under NSPIRE's 
 #' random sampling protocol. By sweeping the proportion of "clean" tenants from 
 #' 0.70 to 1.0, it tracks how spatial clustering of defects impacts regulatory risk.
 #' 
 #' Because extreme tail risks ($P_{05}$) require massive sample sizes to stabilize, 
 #' this script executes 100,000 Monte Carlo iterations per parameter step. To prevent 
-#' memory exhaustion (RAM overflow) when saving raw forensics, the execution is 
+#' RAM overflow when saving raw forensics, the execution is 
 #' architected in smaller batches.
 
 # ==========================================

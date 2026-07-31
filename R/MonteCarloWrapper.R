@@ -1,4 +1,4 @@
-#' Master Orchestrator for NSPIRE Monte Carlo Simulation
+#' Orchestrator for NSPIRE Monte Carlo Simulation
 #'
 #' Executes thousands of "virtual inspections" by repeatedly simulating property decay, 
 #' scheduling maintenance, applying internal audits, and calculating HUD scores. 

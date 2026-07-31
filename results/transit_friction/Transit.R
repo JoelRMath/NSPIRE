@@ -1,14 +1,14 @@
-#' Operational Reality: Transit Friction Tax
+#' Transit Friction Tax
 #'
-#' This execution script quantifies the hidden labor costs associated with physical
-#' human movement and tool transitions during a property-wide maintenance sweep.
+#' Execution script: quantifies the hidden labor costs associated with physical
+#' human movement and tool transitions during a property-wide maintenance.
 #' By running 10,000 paired simulations, it directly compares theoretical "wrench time" 
-#' (frictionless maintenance robots) against realistic ground execution (which includes 
-#' micro-delays for intra-unit tool swaps and macro-delays for inter-unit travel).
-#' This data drives the "Operational Reality Gap" visual in the Quarto report.
+#' (frictionless 'maintenance robots') against realistic human execution (includes 
+#' micro-delays for intra-unit tool swaps and macro-delays for inter-unit travel and short breaks).
+#' This data creates the "Operational Reality Gap" figure in the Quarto report.
 
 # ==========================================
-# Operational Reality: Transit Friction
+# Transit Friction
 # ==========================================
 
 devtools::load_all(".")

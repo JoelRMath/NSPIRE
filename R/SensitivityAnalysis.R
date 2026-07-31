@@ -1,29 +1,29 @@
-# ==========================================
-# 1. Master Sensitivity Runner
-# ==========================================
+# ==================================================
+# 1. Sensitivity Runner, for audit_rate and t_start
+# ==================================================
 
 #' Run Sensitivity Analysis with Exhaustive Observables
 #'
 #' Executes a batch of Monte Carlo simulations across a specified parameter range. 
-#' For each parameter step, it calculates a comprehensive suite of distributional 
+#' For each parameter step, it calculates a set of distributional 
 #' metrics (including Tail Drop, Backlog Probability, and Compliance Risk) and 
 #' extracts the raw density objects required for downstream ridge plotting.
 #'
 #' @param sim_env An \code{InspectionSimulation} object establishing the baseline environment.
-#' @param score_csv Character. Path to the regulatory scoring rubric.
+#' @param score_csv Character. Path to the regulatory scoring config file.
 #' @param param_name Character. String identifier for the parameter to sweep (e.g., "audit_rate", "t_start").
 #' @param param_values Numeric vector. The sequence of values to test across the sweep.
-#' @param save_raw Logical. If TRUE, saves the massive raw defect forensic files to disk (default: FALSE).
+#' @param save_raw Logical. If TRUE, saves the raw defect forensic files to disk (default: FALSE).
 #' @param ... Additional arguments passed dynamically to \code{run_monte_carlo}.
 #' @return A \code{data.frame} where each row represents the exhaustive metrics for a single parameter step.
 #' @export
 run_sensitivity_analysis <- function(sim_env, score_csv, param_name, param_values, save_raw = FALSE, ...) {
   
-  # Ensure the directory structure exists to catch the heavy I/O file drops
+  # Ensure the directory structure exists to catch I/O file drops
   base_dir <- file.path("results", "sensitivity", param_name)
   if (!dir.exists(base_dir)) dir.create(base_dir, recursive = TRUE)
   
-  # Execute the sweep across all specified parameter values
+  # Execute the sweep across specified parameter values
   results_list <- lapply(param_values, function(val) {
     cat(sprintf("Running Analysis: %s = %f\n", param_name, val))
     
@@ -40,7 +40,7 @@ run_sensitivity_analysis <- function(sim_env, score_csv, param_name, param_value
            stop(sprintf("Parameter '%s' not defined in dispatcher.", param_name))
     )
     
-    # 2. Execution: Fire the Monte Carlo ensemble for this specific parameter state
+    # 2. Execution: Monte Carlo ensemble for this specific parameter state
     mc_out <- do.call(run_monte_carlo, c(list(sim_env = current_env, score_csv = score_csv, save_raw = save_raw), wrapper_args))
     
     # 3. Save Raw Iteration Data
@@ -80,7 +80,7 @@ run_sensitivity_analysis <- function(sim_env, score_csv, param_name, param_value
     p05_score <- quantile(scores, 0.05, names = FALSE)
     mean_score <- mean(scores)
     
-    # Construct the wide metric matrix
+    # Construct the metric matrix
     res <- data.frame(
       param_val = val,
       
@@ -100,7 +100,7 @@ run_sensitivity_analysis <- function(sim_env, score_csv, param_name, param_value
       score_max = max(scores),
       
       # --- Risk & Tail Metrics ---
-      tail_drop_median = (med_score - p05_score) / med_score, # The 'tau' metric from the report
+      tail_drop_median = (med_score - p05_score) / med_score, # 'tau' metric from the report
       tail_drop_mean = (mean_score - p05_score) / mean_score,
       fail_risk_60 = mean(scores < 60),                       # Probability of regulatory failure
       critical_fail_risk_30 = mean(scores < 30),
@@ -133,7 +133,7 @@ run_sensitivity_analysis <- function(sim_env, score_csv, param_name, param_value
     
   })
   
-  # Collapse the list of dataframes into a single master summary table and save
+  # Collapse the list of dataframes into a single summary table and save
   summary_df <- do.call(rbind, results_list)
   saveRDS(summary_df, file = file.path(base_dir, "summary.rds"))
   return(summary_df)
@@ -147,7 +147,7 @@ run_sensitivity_analysis <- function(sim_env, score_csv, param_name, param_value
 #'
 #' Automatically loads default project configurations and runs an exhaustive
 #' sweep of the internal audit efficacy (\code{audit_rate}) from 0.05 to 0.95. 
-#' This generates the data used to prove the "Quality Assurance Floor" in the report.
+#' This generates the data used to demonstrate the "Quality Assurance Floor" in the report.
 #'
 #' @param n_iterations Integer. Number of Monte Carlo iterations per step.
 #' @param save_raw Logical. Save raw defect forensics.
@@ -228,7 +228,7 @@ study_prep_time <- function(n_iterations = 1000, save_raw = FALSE) {
   # Define the sweep sequence: Counting backward from a safe 40 days down to a panicked 4 days
   time_test_values <- seq(40, 4, by = -1)
   
-  # Note: For this study, Audit Rate is locked at a highly effective 85% 
+  # Note: For this study, Audit Rate is locked at 85% 
   # to isolate the effect of pure physical time constraints.
   master_summary <- run_sensitivity_analysis(
     sim_env = sim_env,

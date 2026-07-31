@@ -10,6 +10,7 @@ format:
     theme: cosmo
     math: true
     embed-resources: true
+    highlight-style: tango
 bibliography: references.bib
 nocite: |
   @*
@@ -37,15 +38,15 @@ Preparing a property for a HUD NSPIRE inspection is a complex operational challe
 
 This document presents a data-driven approach to optimizing this pre-inspection workflow. By leveraging Monte Carlo simulation, we execute thousands of "virtual inspections." This stochastic engine stress-tests a property's risk profile, bridging ground-level maintenance realities with probabilistic modeling. To enforce the physical laws of maintenance, the workflow is mapped as a Directed Acyclic Graph (DAG), ensuring tasks sequence correctly and temporal lockouts are respected.
 
-Crucially, this model is not a crystal ball. It is not designed to predict a deterministic score for a specific building. Rather, its immediate value is prescriptive. It isolates the mathematical architecture of an inspection to identify critical operational levers and their specific failure thresholds.
+Crucially, this model is not a crystal ball. It is not designed to predict a deterministic score for a specific building. Rather, its immediate value is prescriptive. It isolates the mathematical architecture of an inspection to identify critical operational levers and their failure thresholds.
 
-Ultimately, this document serves as a proof-of-concept for the utility of quantitative analysis in property management. By mapping the interaction of time, labor, and probability, it demonstrates how raw operational data can be translated into definitive directives—identifying staffing requirements, exposing the limits of overtime, and defining the timelines required to guarantee regulatory compliance. Specifically, the simulation reveals the following key findings (note that these were not directly encoded in the model but are boserved in simulation outputs):
+Ultimately, this document serves as a proof-of-concept for the utility of quantitative analysis in property management. By mapping the interaction of time, labor, and probability, it demonstrates how raw operational data can be translated into definitive directives—identifying staffing requirements, exposing the limits of overtime, and defining the timelines required to guarantee regulatory compliance. Specifically, the simulation reveals the following key findings (note that these were not directly encoded in the model but are observed in simulation outputs as consequences of model component interactions):
 
-* **Hidden Labor Tax**: Incorporating realistic human behavior—such as 5-minute intra-unit tool transitions and 15-minute inter-unit transit times—imposes a rigid 34% labor tax on baseline time estimates.
+* **Hidden Labor Tax**: Incorporating realistic human behavior—such as 5-minute intra-unit tool transitions and 15-minute inter-unit transit times—imposes a 34% labor tax on baseline time estimates.
 * **Quality Assurance Floor**: Internal pre-inspections must intercept at least 90% of defects to eliminate failure risk. Conversely, an audit catch rate below 25% is mathematically futile, offering zero protection against the scoring floor.
 * **Overtime Illusion**: Compressing preparation timelines below 15 days forces the workforce into a "backlog cliff." At this threshold, maximum capital expenditure on overtime cannot prevent regulatory failure.
 * **Non-Linear Staffing Surges**: Shortened inspection notices cannot be mitigated simply by authorizing more hours; instead, they demand an exponential surge in active headcount.
-* **Post-Prep Decay Penalty**: Completing repairs too early introduces severe physical decay risk. Properties sitting idle for more than 25 days before an inspection face an exponential spike in defect re-emergence.
+* **Post-Prep Decay Penalty**: Completing repairs too early introduces severe physical decay risk. Properties sitting idle for more than 25 days before an inspection face an exponential spike in defect re-emergence. Note that this increase is not linear with time but displays a sudden rise after 25 days.
 * **Lottery Effect**: HUD’s random sampling protocol severely penalizes spatial variance. A handful of highly destructive tenants in an otherwise pristine building triples the probability of a catastrophic inspection failure. To neutralize this threat, management could aggressively target high-risk units during the internal audit, using low historical service request rates as a predictive proxy for hidden defects.
 
 Readers who prefer to skip the mathematical definitions and simulation mechanics can jump directly to @sec-friction to explore the findings.
@@ -1198,7 +1199,7 @@ workflow:
 
 # Appendix B: R code
 
-## Simulator code
+## B.1 Simulator code
 
 ```{mermaid}
 %%| fig-cap: "Architecture of the NSPIRE Simulation Framework"
@@ -1236,7 +1237,7 @@ graph TD
     style OOP fill:#ffffff,stroke:#cccccc,stroke-width:2px,color:#000000
     style Engine fill:#ffffff,stroke:#cccccc,stroke-width:2px,color:#000000
 
-    %% Explicitly Style Nodes to prevent text wash-out
+    %% Explicitly Style Nodes
     style DAG fill:#e1f5fe,stroke:#0288d1,stroke-width:2px,color:#000000
     style ENV fill:#e1f5fe,stroke:#0288d1,stroke-width:2px,color:#000000
     style MC fill:#fff3e0,stroke:#f57c00,stroke-width:2px,color:#000000
@@ -1245,14 +1246,62 @@ graph TD
     style AUDIT fill:#f5f5f5,stroke:#9e9e9e,stroke-width:1px,color:#000000
     style SCORE fill:#f5f5f5,stroke:#9e9e9e,stroke-width:1px,color:#000000
 
-    %% Explicitly Style Links (Edges) to force black text
+    %% Explicitly Style Links (Edges)
     linkStyle default stroke:#555555,stroke-width:1px,color:#000000
+```
+
+```{mermaid}
+%%| fig-cap: "Integration of Configuration Files into the Codebase"
+
+%%{init: {'theme': 'base', 'themeVariables': {'background': '#ffffff', 'clusterBkg': '#f8f9fa', 'clusterBorder': '#b0bec5', 'primaryTextColor': '#000000', 'lineColor': '#555555', 'edgeLabelBackground': '#f9fbe7', 'tertiaryTextColor': '#000000'}}}%%
+
+graph LR
+    %% Inputs
+    subgraph Configs [Configuration Files]
+        direction TB
+        C_TASKS["<b>tasks_config.csv</b>"]
+        C_FP["<b>floorplans_config.csv</b>"]
+        C_YAML["<b>scenario1.yml</b>"]
+        C_SCORE["<b>scoring_config.csv</b>"]
+    end
+
+    %% Targets
+    subgraph Codebase [Simulation Components]
+        direction TB
+        DAG["<b>InspectionDAG</b><br>Mathematical Graph & Tasks"]
+        ENV["<b>InspectionSimulation</b><br>Complete Scenario Environment"]
+        SCORE("<b>calculate_inspection_score</b><br><i>HUD Deductions</i>")
+    end
+
+    %% Mappings
+    C_TASKS ==>|"Builds"| DAG
+    C_FP ==>|"Defines Spatial Units"| ENV
+    C_YAML ==>|"Sets Strategies & Constraints"| ENV
+    C_SCORE ==>|"Provides Deduction Weights"| SCORE
+
+    %% Subgraph Styling
+    style Configs fill:#ffffff,stroke:#cccccc,stroke-width:2px,color:#000000
+    style Codebase fill:#ffffff,stroke:#cccccc,stroke-width:2px,color:#000000
+
+    %% File Nodes (Green)
+    style C_TASKS fill:#e8f5e9,stroke:#388e3c,stroke-width:2px,color:#000000
+    style C_FP fill:#e8f5e9,stroke:#388e3c,stroke-width:2px,color:#000000
+    style C_YAML fill:#e8f5e9,stroke:#388e3c,stroke-width:2px,color:#000000
+    style C_SCORE fill:#e8f5e9,stroke:#388e3c,stroke-width:2px,color:#000000
+    
+    %% Target Nodes (Blue & Grey)
+    style DAG fill:#e1f5fe,stroke:#0288d1,stroke-width:2px,color:#000000
+    style ENV fill:#e1f5fe,stroke:#0288d1,stroke-width:2px,color:#000000
+    style SCORE fill:#f5f5f5,stroke:#9e9e9e,stroke-width:1px,color:#000000
+    
+    %% Edge Styling
+    linkStyle default stroke:#555555,stroke-width:2px,color:#000000
 ```
 
 
 ```{r}
-#| label: tbl-scripts
-#| tbl-cap: "NSPIRE Simulator R Scripts and Architecture Roles"
+#| label: tbl-scripts-simulator
+#| tbl-cap: "Core NSPIRE Simulator R Scripts and Architecture Roles"
 #| echo: false
 #| message: false
 #| warning: false
@@ -1265,39 +1314,21 @@ scripts_df <- data.frame(
     "InspectionSimulation.R", 
     "SimulationEngine.R", 
     "ScoringEngine.R", 
-    "MonteCarloWrapper.R", 
-    "Tools.R", 
-    "SensitivityAnalysis.R", 
-    "Decay.R", 
-    "TenantMix.R", 
-    "RunSolver.R", 
-    "Transit.R"
+    "MonteCarloWrapper.R"
   ),
   `Architecture Role` = c(
     "S4 Data Structure", 
     "S4 Data Structure", 
     "Core Engine", 
     "Core Engine", 
-    "Core Engine", 
-    "Operational Logic", 
-    "Analysis Suite", 
-    "Execution Script", 
-    "Execution Script", 
-    "Execution Script", 
-    "Execution Script"
+    "Core Engine"
   ),
   `Description` = c(
     "Defines the mathematical graph, ensuring physical prerequisites and task dependencies are rigidly enforced.",
     "The operational wrapper that combines the DAG, physical floorplans, and YAML constraints into a complete, pre-calculated environment.",
     "The physics and logistics module; handles Beta-PERT stochastic times, defect generation, and context-aware scheduling/transit friction.",
     "The regulatory filter; applies internal quality control (audit catch rates), HUD random sampling protocols, and final score deductions.",
-    "The master orchestrator that loops the execution sequence (Generation -> Scheduling -> Audit -> Scoring) across thousands of iterations.",
-    "Houses the prescriptive find_required_capacity binary search algorithm, decoupling labor limits from scoring to strictly target backlog probability.",
-    "The dispatcher and observables calculator; extracts comprehensive distribution metrics (e.g., tail drops, costs) when sweeping parameters like audit rate or prep time.",
-    "Maps the exponential failure risk of the 'Too Early' penalty by sweeping the post-prep idle window (t_end).",
-    "A high-volume (100k iteration) batched script designed to stabilize extreme tail metrics and quantify the spatial clustering 'Lottery Effect.'",
-    "Inverts the simulation to answer prescriptive staffing questions, calling the binary search tool to map required labor against a shrinking timeline.",
-    "Executes paired simulations to quantify the 34% 'Operational Reality Gap', comparing frictionless ideal execution against realistic ground execution."
+    "The master orchestrator that loops the execution sequence (Generation -> Scheduling -> Audit -> Scoring) across thousands of iterations."
   ),
   check.names = FALSE,
   stringsAsFactors = FALSE
@@ -1306,6 +1337,116 @@ scripts_df <- data.frame(
 kable(scripts_df, align = c('l', 'l', 'l'))
 ```
 
+### B.1.1 InspectionDAG.R
+
+```{r}
+#| eval: false
+#| echo: true
+#| code: !expr readLines("../R/InspectionDAG.R")
+```
+
+### B.1.2 InspectionSimulation.R
+
+```{r}
+#| eval: false
+#| echo: true
+#| code: !expr readLines("../R/InspectionSimulation.R")
+```
+
+### B.1.3 SimulationEngine.R
+
+```{r}
+#| eval: false
+#| echo: true
+#| code: !expr readLines("../R/SimulationEngine.R")
+```
+
+### B.1.4 ScoringEngine.R
+
+```{r}
+#| eval: false
+#| echo: true
+#| code: !expr readLines("../R/ScoringEngine.R")
+```
+
+### B.1.5 MonteCarloWrapper.R
+
+```{r}
+#| eval: false
+#| echo: true
+#| code: !expr readLines("../R/MonteCarloWrapper.R")
+```
+
+## B.2 Execution Scripts and Utilities
+
+```{r}
+#| label: tbl-scripts-b2
+#| tbl-cap: "Execution Scripts and Utilities"
+#| echo: false
+#| message: false
+#| warning: false
+
+library(knitr)
+
+scripts_df <- data.frame(
+  `Script Name` = c(
+    "Tools.R", 
+    "SensitivityAnalysis.R", 
+    "Decay.R", 
+    "TenantMix.R", 
+    "RunSolver.R", 
+    "Transit.R",
+    "Visualization.R"
+  ),
+  `Architecture Role` = c(
+    "Operational Logic", 
+    "Analysis Suite", 
+    "Execution Script", 
+    "Execution Script", 
+    "Execution Script", 
+    "Execution Script",
+    "Utility Script"
+  ),
+  `Description` = c(
+    "Houses the prescriptive find_required_capacity binary search algorithm, decoupling labor limits from scoring to strictly target backlog probability.",
+    "The dispatcher and observables calculator; extracts comprehensive distribution metrics (e.g., tail drops, costs) when sweeping parameters like audit rate or prep time.",
+    "Maps the exponential failure risk of the 'Too Early' penalty by sweeping the post-prep idle window (t_end).",
+    "A high-volume (100k iteration) batched script designed to stabilize extreme tail metrics and quantify the spatial clustering 'Lottery Effect.'",
+    "Inverts the simulation to answer prescriptive staffing questions, calling the binary search tool to map required labor against a shrinking timeline.",
+    "Executes paired simulations to quantify the 34% 'Operational Reality Gap', comparing frictionless ideal execution against realistic ground execution.",
+    "Provides helper functions, dynamic boundary highlighting, and strict semantic color palettes to generate consistent report figures."
+  ),
+  check.names = FALSE,
+  stringsAsFactors = FALSE
+)
+
+kable(scripts_df, align = c('l', 'l', 'l'))
+```
+
+
+### B.2.1 Tools.R
+
+```{r}
+#| eval: false
+#| echo: true
+#| code: !expr readLines("../R/Tools.R")
+```
+
+### B.2.2 SensitivityAnalysis.R
+
+```{r}
+#| eval: false
+#| echo: true
+#| code: !expr readLines("../R/SensitivityAnalysis.R")
+```
+
+### B.2.3 Decay.R
+
+```{r}
+#| eval: false
+#| echo: true
+#| code: !expr readLines("../results/sensitivity/t_end/Decay.R")
+```
 
 <style>
 .floating-copyright {

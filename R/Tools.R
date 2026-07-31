@@ -1,6 +1,3 @@
-# ==========================================
-# Prescriptive Analytics and Operational Tools
-# ==========================================
 
 #' Prescriptive Analytics: Find Required Tech Headcount (Capacity Solver)
 #'

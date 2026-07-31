@@ -1,16 +1,20 @@
 #' Prescriptive Analytics: Staffing Curve Solver
 #'
-#' This execution script inverts the standard simulation framework to answer a 
-#' prescriptive operational question: Given a shrinking inspection notice window 
-#' (t_start), exactly how many technicians are required to prevent a task backlog?
+#' Execution script: inverts the simulation framework to answer a 
+#' prescriptive question: Given a shrinking inspection notice window 
+#' (t_start), how many technicians are required to prevent a task backlog?
+#' By wrapping a binary search algorithm around the Monte Carlo engine, the script
+#' maps the non-linear (exponential-like) relationship between time compression and 
+#' required labor capacity. 
 #' 
-#' By wrapping a binary search algorithm around the Monte Carlo engine, it efficiently 
-#' maps the non-linear (exponential) relationship between time compression and 
-#' required labor capacity.
+#' Important: in order to have a monotonic function (required for binary search) the task
+#' backlog is used. This is not the case when using a target score instead of backlog.
+#' 
+#' Note: this script uses find_required_capacity() which is implemented in Tools.R
 
-# ==========================================
+# ==============================================
 # Prescriptive Analytics: Staffing Curve Solver
-# ==========================================
+# ==============================================
 
 devtools::load_all(".")
 library(ggplot2)

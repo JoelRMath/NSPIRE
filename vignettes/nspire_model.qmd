@@ -32,24 +32,26 @@ library(scales)
 library(patchwork)
 ```
 
-# 1. Introduction
+# 1. Executive Summary & Key Findings
 
 Preparing a property for a HUD NSPIRE inspection is a complex operational challenge governed by rigid constraints: labor limits, task dependencies, and tenant behavior.
 
-This document presents a data-driven approach to optimizing this pre-inspection workflow. By leveraging Monte Carlo simulation, we execute thousands of "virtual inspections." This stochastic engine stress-tests a property's risk profile, bridging ground-level maintenance realities with probabilistic modeling. To enforce the physical laws of maintenance, the workflow is mapped as a Directed Acyclic Graph (DAG), ensuring tasks sequence correctly and temporal lockouts are respected.
+This document presents a data-driven approach to optimizing this pre-inspection workflow. By leveraging Monte Carlo simulation, we execute thousands of "virtual inspections." This stochastic engine stress-tests a property's risk profile, bridging ground-level maintenance realities with probabilistic modeling. To enforce the physical laws of maintenance, the workflow is mapped as a Directed Acyclic Graph (DAG) (@sec-dag), ensuring tasks sequence correctly and temporal lockouts are respected.
 
-Crucially, this model is not a crystal ball. It is not designed to predict a deterministic score for a specific building. Rather, its immediate value is prescriptive. It isolates the mathematical architecture of an inspection to identify critical operational levers and their failure thresholds.
+Because the model is driven by modular configuration files—defining specific maintenance tasks, building floor plans, labor scenarios, and scoring schemes—it is highly adaptable and can easily generate tailored baseline estimates for any given property. However, its strategic value goes beyond forecasting a score distribution. Rather, its immediate value is highly prescriptive: it isolates the mathematical architecture of an inspection to identify critical operational levers and their failure thresholds."
 
-Ultimately, this document serves as a proof-of-concept for the utility of quantitative analysis in property management. By mapping the interaction of time, labor, and probability, it demonstrates how raw operational data can be translated into definitive directives—identifying staffing requirements, exposing the limits of overtime, and defining the timelines required to guarantee regulatory compliance. Specifically, the simulation reveals the following key findings (note that these were not directly encoded in the model but are observed in simulation outputs as consequences of model component interactions):
+Ultimately, this document serves as a proof-of-concept for the utility of quantitative analysis in property management. By mapping the interaction of time, labor, and probability, it demonstrates how raw operational data can be translated into definitive directives—identifying staffing requirements, exposing the limits of overtime, and defining the timelines required to guarantee regulatory compliance.
 
-* **Hidden Labor Tax**: Incorporating realistic human behavior—such as 5-minute intra-unit tool transitions and 15-minute inter-unit transit times—imposes a 34% labor tax on baseline time estimates.
-* **Quality Assurance Floor**: Internal pre-inspections must intercept at least 90% of defects to eliminate failure risk. Conversely, an audit catch rate below 25% is mathematically futile, offering zero protection against the scoring floor.
-* **Overtime Illusion**: Compressing preparation timelines below 15 days forces the workforce into a "backlog cliff." At this threshold, maximum capital expenditure on overtime cannot prevent regulatory failure.
-* **Non-Linear Staffing Surges**: Shortened inspection notices cannot be mitigated simply by authorizing more hours; instead, they demand an exponential surge in active headcount.
-* **Post-Prep Decay Penalty**: Completing repairs too early introduces severe physical decay risk. Properties sitting idle for more than 25 days before an inspection face an exponential spike in defect re-emergence. Note that this increase is not linear with time but displays a sudden rise after 25 days.
-* **Lottery Effect**: HUD’s random sampling protocol severely penalizes spatial variance. A handful of highly destructive tenants in an otherwise pristine building triples the probability of a catastrophic inspection failure. To neutralize this threat, management could aggressively target high-risk units during the internal audit, using low historical service request rates as a predictive proxy for hidden defects.
+Specifically, the simulation reveals the following key findings. Importantly, these insights were not explicitly programmed into the model; rather, they emerged as consequences of complex component interactions:
 
-Readers who prefer to skip the mathematical definitions and simulation mechanics can jump directly to @sec-friction to explore the findings.
+*   **The Hidden Labor Tax:** Idealized time estimates fail in the field. Incorporating realistic human behavior—such as 5-minute intra-unit tool transitions and 15-minute inter-unit transit times—imposes a severe 34% labor tax on baseline estimates, a discrepancy we define as the Operational Reality Gap (see @fig-transit-friction).
+*   **The Quality Assurance Floor:** Internal pre-inspections must be highly rigorous. The model demonstrates that teams must intercept at least 90% of existing defects to virtually eliminate failure risk. Conversely, an audit catch rate below 25% is mathematically futile, offering zero protection against the scoring floor (@fig-failure-audit).
+*   **The Overtime Illusion:** Capital cannot infinitely solve scheduling crunches. Compressing preparation timelines below 15 days forces the workforce into a "backlog cliff." At this threshold, authorizing maximum capital expenditure on overtime cannot prevent regulatory failure (@fig-time-crunch-labor and @fig-time-crunch-backlog).
+*   **Non-Linear Staffing Surges:** Shortened inspection notices cannot be mitigated simply by authorizing more hours. Because of strict task dependencies and spatial lockouts, compressed timelines demand an exponential surge in active headcount to execute parallel workflows. For example, halving a preparation schedule from 14 days to 7 days does not simply double the required workforce; it multiplies it by a factor of six (@fig-staffing-curve).
+*   **The Post-Prep Decay Penalty:** Completing repairs too early introduces significant physical decay risk. Crucially, this decay does not accumulate gradually; it behaves as a strict mathematical threshold. The model reveals an approximate 20-day "grace period" where median scores remain stable and the probability of failure stays near zero. However, immediately following this window, the property faces a sharp acceleration in defect re-emergence. Score confidence erodes significantly—with the 5th percentile worst-case score dropping steeply—and failure probabilities rise exponentially. Success therefore requires precise, "just-in-time" scheduling: preparations should start early enough to avoid capacity exhaustion, but finish late enough to stay safely within this pre-inspection decay threshold (@fig-decay-score and @fig-decay-risk).
+*   **The Lottery Effect:** HUD’s random sampling protocol severely penalizes spatial variance. A handful of highly destructive tenants in an otherwise pristine building triples the probability of a catastrophic inspection failure. To neutralize this threat, management could aggressively target high-risk units during the internal audit, using low historical service request rates as a predictive proxy for hidden defects (@fig-tenant-risk).
+
+"The following sections explore the operational realities exposed by these simulations, detailing the specific thresholds where standard preparation strategies fail. For readers interested in the structural logic of the model, the mathematical architecture and simulation mechanics—including the Directed Acyclic Graph (DAG) workflow mapping—are detailed in Section X, prior to the appendices."
 
 # 2. The NSPIRE Scoring Mechanism
 
@@ -181,10 +183,13 @@ $$f(t_i) = \sum_{k} p_{i,k} \cdot \text{PERT}(t; a_k, m_k, b_k)$$
 Using a single "average time" for such a task would be an operational disaster, as it would plan for an event that never actually happens. As illustrated in @fig-multimodal-pert, the mixture distribution correctly captures the bifurcated reality of the repair.
 
 ```{r}
+#| label: fig-multimodal-pert
+#| fig-cap: "Example of a Bimodal Mixture Distribution. The mathematical 'average' time falls in a dead zone, highlighting why stochastic modeling is required for accurate labor planning."
+#| fig-width: 8
+#| fig-height: 4
 #| echo: false
 #| message: false
 #| warning: false
-#| fig-cap: "Example of a Bimodal Mixture Distribution. The mathematical 'average' time falls in a dead zone, highlighting why stochastic modeling is required for accurate labor planning."
 
 library(ggplot2)
 library(dplyr)
@@ -205,7 +210,7 @@ mixture <- state1 + state2
 df <- data.frame(Time = x, Density = mixture)
 mean_time <- sum(df$Time * df$Density) / sum(df$Density)
 
-my_plot <- ggplot(df, aes(x = Time, y = Density)) +
+ggplot(df, aes(x = Time, y = Density)) +
   geom_area(fill = "#4e79a7", alpha = 0.6) +
   geom_line(color = "#2c4663", linewidth = 1) +
   geom_vline(xintercept = mean_time, color = "#e15759", linetype = "dashed", linewidth = 1) +
@@ -219,16 +224,7 @@ my_plot <- ggplot(df, aes(x = Time, y = Density)) +
     y = "Probability Density"
   ) +
   theme(panel.grid.minor = element_blank())
-ggplot2::ggsave(
-  filename = "figures/multimodal-pert.png", 
-  plot = my_plot, 
-  width = 8, 
-  height = 4, 
-  dpi = 300 # 300 is standard for crisp, professional documents
-)
 ```
-
-![Example of a Bimodal Mixture Distribution. The mathematical 'average' time falls in a dead zone, highlighting why stochastic modeling is required for accurate labor planning.](figures/multimodal-pert.png){#fig-multimodal-pert}
 
 By mapping these mixture distributions across the entire property, we build a comprehensive dictionary of constraints. The complete operational matrix—detailing baseline defect rates, multi-state PERT parameters, material costs, and prerequisite dependencies—is defined in @tbl-tasks-config.
 
@@ -279,7 +275,7 @@ Crucially, this decay is not uniform across the property. The effective daily pr
 
 Beyond stochastic time estimates and decay rates, the master configuration table (@tbl-tasks-config) contains one more vital operational constraint: the prerequisites column. Real-world maintenance cannot be executed in a random order. To enforce the physical sequence of repairs, the simulation translates these prerequisites into a Directed Acyclic Graph (DAG), enforcing the rigid "order of operations" required to prep a unit.
 
-# 4. Resource Mapping and Graph Topology (DAG)
+# 4. Resource Mapping and Graph Topology (DAG){#sec-dag}
 
 Repairs cannot always happen simultaneously or in random order. For example, you cannot paint a wall before patching the drywall, and you cannot patch the drywall before fixing the plumbing leak behind it.
 
@@ -455,6 +451,10 @@ To accurately model ground-level execution, the simulation injects "transit fric
 To quantify the macroeconomic impact of these human constraints, the simulation executed 10,000 paired scenarios (comparing pure wrench time against friction-adjusted time) for a standard 50-unit property. Results are summarized with @fig-transit-friction.
 
 ```{r}
+#| label: fig-transit-friction
+#| fig-cap: "Transit Friction: including short breaks after a unit task (~5min) and slightly longer ones (~15min) when swiching to a different unit induces a 34.2% tax time."
+#| fig-width: 9
+#| fig-height: 6
 #| echo: false
 #| message: false
 #| warning: false
@@ -465,7 +465,7 @@ mean_ideal <- mean(paired_data$Ideal)
 mean_real <- mean(paired_data$Realistic)
 tax_pct <- ((mean_real - mean_ideal) / mean_ideal) * 100
 
-p <- ggplot(plot_data, aes(x = Total_Hours, fill = Scenario, color = Scenario)) +
+ggplot(plot_data, aes(x = Total_Hours, fill = Scenario, color = Scenario)) +
   geom_density(alpha = 0.6, linewidth = 1) +
   scale_fill_manual(values = c("Ideal" = "#4e79a7", "Realistic" = "#e15759"),
                     labels = c("Theoretical Wrench Time", "Realistic Time (with Friction)")) +
@@ -482,17 +482,7 @@ p <- ggplot(plot_data, aes(x = Total_Hours, fill = Scenario, color = Scenario)) 
     legend.title = element_blank(),
     panel.grid.minor = element_blank()
   )
-
-ggplot2::ggsave(
-  filename = "figures/transit-friction.png", 
-  plot = p, 
-  width = 9, 
-  height = 6, 
-  dpi = 150
-)
 ```
-
-![Transit Friction: including short breaks after a unit task (~5min) and slightly longer ones (~15min) when swiching to a different unit induces a 34.2% tax time.](figures/transit-friction.png){#fig-transit-friction}
 
 ## Conclusions
 
@@ -511,34 +501,33 @@ The internal pre-inspection audit is modeled by $\alpha_\text{audit}$, the proba
 @fig-audit-ridges provides a visual summary of the resulting score distributions, bounded by a red failure threshold at 60.
 
 ```{r}
+#| label: fig-audit-ridges
+#| fig-cap: "Risk Transition: Audit Rate vs. Score Distribution."
+#| fig-width: 9
+#| fig-height: 6
 #| echo: false
 #| message: false
 #| warning: false
 
 sweep_data <- load_sensitivity_iterations(here("results", "sensitivity", "audit_rate"))
 
-# Generate the plot
-p <- plot_sensitivity_ridges(
+# Generate and print the plot
+plot_sensitivity_ridges(
   sensitivity_df = sweep_data,
   param_label = "Audit Catch Rate (Efficacy)",
   title = "Audit Rate vs. Score Distribution"
 )
-
-ggplot2::ggsave(
-  filename = "figures/audit-ridges.png", 
-  plot = p, 
-  width = 9, 
-  height = 6, 
-  dpi = 150
-)
 ```
 
-![Risk Transition: Audit Rate vs. Score Distribution.](figures/audit-ridges.png){#fig-audit-ridges}
 
 Failure risk is almost completely eliminated when $\alpha_\text{audit} \geq 0.90$. @fig-distribution-slice further illustrates the transition from high to low risk as $\alpha_\text{audit}$ increases from 0.55 to 0.85. Failure risk is estimated by the proportion of the 1,000 simulations yielding a score below 60, represented visually by the area under the density curve to the left of the red critical line.
 
 
 ```{r}
+#| label: fig-distribution-slice
+#| fig-cap: "Examples of Score Distribution: $\\alpha_\\text{audit} = 0.55$ (left) and $\\alpha_\\text{audit} = 0.85$ (right)."
+#| fig-width: 12
+#| fig-height: 6
 #| echo: false
 #| message: false
 #| warning: false
@@ -562,103 +551,79 @@ plots <- lapply(scenarios, function(rate) {
   )
 })
 
-p <- plots[[1]] | plots[[2]]
-
-ggplot2::ggsave(
-  filename = "figures/distribution-slice.png", 
-  plot = p, 
-  width = 12, 
-  height = 6, 
-  dpi = 150
-)
+# Render the combined plot
+plots[[1]] | plots[[2]]
 ```
 
-![Examples of Score Distribution: $\alpha_\text{audit} = 0.55$ (left) and $\alpha_\text{audit} = 0.85$ (right).](figures/distribution-slice.png){#fig-distribution-slice}
 
 Tracking these probabilities across all values of $\alpha_\text{audit}$ yields @fig-failure-audit. The data demonstrates that critical failure risk (score < 30) is only marginalized when the audit catch rate exceeds 0.75, while full protection against standard failure (score < 60) requires efficacy above 0.90. This reflects the fact that HUD's unit sampling schemes (see @tbl-hud-sampling) have been designed so as to remove the possibility of a lucky draw.
 
 ```{r}
+#| label: fig-failure-audit
+#| fig-cap: "Failure probabilities at scores 30 and 60 as a function of audit catch rate $\\alpha_\\text{audit}$."
+#| fig-width: 6
+#| fig-height: 4
 #| echo: false
 #| message: false
 #| warning: false
 
 sum_df <- readRDS(here("results", "sensitivity", "audit_rate", "summary.rds"))
 
-p <- plot_sensitivity_multi(
+plot_sensitivity_multi(
   sum_df, 
   y_vars = c("fail_risk_60", "critical_fail_risk_30"),
   param_label = "Audit Catch Rate",
   y_label = "Probability",
   title = "Impact of Audit Efficacy on Regulatory Failure"
 )
-
-ggplot2::ggsave(
-  filename = "figures/failure-audit.png", 
-  plot = p, 
-  width = 6, 
-  height = 4, 
-  dpi = 150
-)
 ```
 
-![Failure probabilities at scores 30 and 60 as a function of audit catch rate $\alpha_\text{audit}$.](figures/failure-audit.png){#fig-failure-audit}
 
 Beyond baseline failure probabilities, the tail-drop metric $\tau$ (@eq-tau) measures downside volatility. To understand its sensitivity to $\alpha_\text{audit}$, we first examine how other score statistics evolve across the parameter range, as displayed in @fig-dist-stats-audit.
 
 ```{r}
+#| label: fig-dist-stats-audit
+#| fig-cap: "Score statistics as a function of audit catch rate $\\alpha_\\text{audit}$."
+#| fig-width: 6
+#| fig-height: 4
 #| echo: false
 #| message: false
 #| warning: false
 
 sum_df <- readRDS(here("results", "sensitivity", "audit_rate", "summary.rds"))
 
-p <- plot_sensitivity_multi(
+plot_sensitivity_multi(
   sum_df, 
   y_vars = c("score_p05", "score_median", "score_sd"),
   param_label = "Audit Catch Rate",
   y_label = "Score",
   title = "Impact of Audit Efficacy on Score Statistics"
 )
-
-ggplot2::ggsave(
-  filename = "figures/dist-stats-audit.png", 
-  plot = p, 
-  width = 6, 
-  height = 4, 
-  dpi = 150
-)
 ```
-
-![Score statistics as a function of audit catch rate $\alpha_\text{audit}$.](figures/dist-stats-audit.png){#fig-dist-stats-audit}
 
 
 As $\alpha_\text{audit}$ exceeds 0.25, the median score rises linearly. Once $\alpha_\text{audit}$ climbs above 0.45, the 5th percentile score ($P_{05}$) also rises, but with a steeper slope. This narrows the gap between the median and the worst-case outcomes. This variance compression—also reflected by the decreasing standard deviation—drives the profile of the tail-drop metric $\tau$, displayed in @fig-tau-audit.
 
 ```{r}
+#| label: fig-tau-audit
+#| fig-cap: "Tail drop metric $\\tau$ as a function of audit catch rate $\\alpha_\\text{audit}$."
+#| fig-width: 6
+#| fig-height: 4
 #| echo: false
 #| message: false
 #| warning: false
 
 sum_df <- readRDS(here("results", "sensitivity", "audit_rate", "summary.rds"))
 
-p <- plot_sensitivity_multi(
+plot_sensitivity_multi(
   sum_df, 
   y_vars = c("tail_drop_median"),
   param_label = "Audit Catch Rate",
   y_label = "Tail Drop Metric",
   title = "Impact of Audit Efficacy on Tail Drop Metric."
 )
-
-ggplot2::ggsave(
-  filename = "figures/tau-audit.png", 
-  plot = p, 
-  width = 6, 
-  height = 4, 
-  dpi = 150
-)
 ```
 
-![Tail drop metric $\tau$ as a function of audit catch rate $\alpha_\text{audit}$.](figures/tau-audit.png){#fig-tau-audit}
 
 ### Conclusions
 
@@ -676,6 +641,10 @@ To model this operational squeeze, the preparation window ($t_\text{start}$) was
 As the preparation window shrinks, the volume of identified defects remains constant, but the time available to clear them—and the time available to walk between them—compresses. 
 
 ```{r}
+#| label: fig-time-crunch-ridges
+#| fig-cap: "Score Distribution Evolution under time compression. Ridges are shown at 4-day intervals for visual clarity."
+#| fig-width: 9
+#| fig-height: 6
 #| echo: false
 #| message: false
 #| warning: false
@@ -686,23 +655,13 @@ sweep_data <- load_sensitivity_iterations(here("results", "sensitivity", "t_star
 subset_days <- seq(4, 36, by = 3)
 sweep_data_sub <- sweep_data[as.numeric(sweep_data$param_val) %in% subset_days, ]
 
-# Generate the plot
-p <- plot_sensitivity_ridges(
+# Generate and print the plot
+plot_sensitivity_ridges(
   sensitivity_df = sweep_data_sub,
   param_label = "Days of Notice (t_start)",
   title = "Time Crunch vs. Score Distribution"
 )
-
-ggplot2::ggsave(
-  filename = "figures/time-crunch-ridges.png", 
-  plot = p, 
-  width = 9, 
-  height = 6, 
-  dpi = 150
-)
 ```
-
-![Score Distribution Evolution under time compression. Ridges are shown at 4-day intervals for visual clarity.](figures/time-crunch-ridges.png){#fig-time-crunch-ridges}
 
 
 As visualised in @fig-time-crunch-ridges, the score distribution remains stable when $t_\text{start} \geq 28$. However, as time compresses, the distribution stretches heavily to the left before completely fracturing and collapsing into the failure zone.
@@ -710,30 +669,25 @@ As visualised in @fig-time-crunch-ridges, the score distribution remains stable 
 The initial impact is purely financial, as visualized in @fig-time-crunch-labor.
 
 ```{r}
+#| label: fig-time-crunch-labor
+#| fig-cap: "Mean total labor cost and overtime cost as the preparation window ($t_\\text{start}$) changes. Note the massive overtime spike at Day 22 followed by the sharp drop in total costs as the timeline collapses."
+#| fig-width: 6
+#| fig-height: 4
 #| echo: false
 #| message: false
 #| warning: false
 
 sum_df_time <- readRDS(here("results", "sensitivity", "t_start", "master_time_crunch_study.rds"))
 
-p <- plot_sensitivity_multi(
+plot_sensitivity_multi(
   sum_df_time, 
   y_vars = c("total_cost_mean", "overtime_mean"),
   param_label = "Days of Notice (t_start)",
   y_label = "Cost ($)",
   title = "Financial Impact of Compressed Prep Windows"
 )
-
-ggplot2::ggsave(
-  filename = "figures/time-crunch-labor.png", 
-  plot = p, 
-  width = 6, 
-  height = 4, 
-  dpi = 150
-)
 ```
 
-![Mean total labor cost and overtime cost as the preparation window ($t_\text{start}$) changes. Note the massive overtime spike at Day 22 followed by the sharp drop in total costs as the timeline collapses.](figures/time-crunch-labor.png){#fig-time-crunch-labor}
 
 At first glance, the left side of @fig-time-crunch-labor appears counter-intuitive: as the preparation window drops below 20 days, the total expected cost plunges dramatically. This is not an efficiency gain; it is the mathematical manifestation of deferred maintenance (tasks that cannot be done before inspection day).
 
@@ -742,56 +696,43 @@ Reading the figure from right to left as the timeline compresses, between Day 30
 @fig-time-crunch-backlog illustrates the severe regulatory consequences of this capacity exhaustion.
 
 ```{r}
+#| label: fig-time-crunch-backlog
+#| fig-cap: "Probability of generating a task backlog and the resulting regulatory failure risk (< 60) under compressed timelines."
+#| fig-width: 6
+#| fig-height: 4
 #| echo: false
 #| message: false
 #| warning: false
 
-p <- plot_sensitivity_multi(
+plot_sensitivity_multi(
   sum_df_time, 
   y_vars = c("backlog_prob", "fail_risk_60", "critical_fail_risk_30"),
   param_label = "Days of Notice (t_start)",
   y_label = "Probability",
   title = "The Backlog Cliff: Capacity Exhaustion"
 )
-
-ggplot2::ggsave(
-  filename = "figures/time-crunch-backlog.png", 
-  plot = p, 
-  width = 6, 
-  height = 4, 
-  dpi = 150
-)
 ```
-
-![Probability of generating a task backlog and the resulting regulatory failure risk ($<60$) under compressed timelines.](figures/time-crunch-backlog.png){#fig-time-crunch-backlog}
 
 
 Finally, we map the Tail Drop metric ($\tau$) as a function of the preparation window. This demonstrates how temporal limits affect the volatility of outcomes.
 
 ```{r}
+#| label: fig-time-crunch-tau
+#| fig-cap: "Tail Drop Metric $\\tau$ as a function of the preparation window. High $\\tau$ indicates massive outcome volatility."
+#| fig-width: 6
+#| fig-height: 4
 #| echo: false
 #| message: false
 #| warning: false
 
-p <- plot_sensitivity_multi(
+plot_sensitivity_multi(
   sum_df_time, 
   y_vars = c("tail_drop_median"),
   param_label = "Days of Notice (t_start)",
   y_label = "Tail Drop Metric",
   title = "Impact of Prep Window on Tail Drop Metric"
 )
-
-ggplot2::ggsave(
-  filename = "figures/time-crunch-tau.png", 
-  plot = p, 
-  width = 6, 
-  height = 4, 
-  dpi = 150
-)
 ```
-
-![Tail Drop Metric $\tau$ as a function of the preparation window. High $\tau$ indicates massive outcome volatility.](figures/time-crunch-tau.png){#fig-time-crunch-tau}
-
 
 ### Conclusions
 
@@ -806,6 +747,10 @@ ggplot2::ggsave(
 Having established in Section 9.2 that a compressed timeline leads to capacity exhaustion, the model can be inverted to estimate necessary staffing levels. By decoupling labor constraints from the audit catch rate, we can ask a specific operational question: Given a fixed preparation window, what is the minimum headcount required to achieve a 99.9% probability of clearing the known backlog? Using a binary search algorithm wrapped around the Monte Carlo engine ($K=1,000$ iterations per step), we mapped the required workforce capacity as the timeline collapses. A strict operational threshold ($P(\text{Backlog} > 0) \le 0.001$) was targeted to ensure the estimated staffing levels are mathematically robust.
 
 ```{r}
+#| label: fig-staffing-curve
+#| fig-cap: "Prescriptive Staffing Curve: Required technicians as a function of days of notice ($t_\\text{start}$)."
+#| fig-width: 6
+#| fig-height: 4
 #| echo: false
 #| message: false
 #| warning: false
@@ -814,7 +759,7 @@ Having established in Section 9.2 that a compressed timeline leads to capacity e
 # Assuming it was saved via: saveRDS(staffing_df, here("results", "sensitivity", "t_start", "staffing_curve.rds"))
 staffing_df <- readRDS(here::here("results", "sensitivity", "t_start", "staffing_curve.rds"))
 
-p <- ggplot2::ggplot(staffing_df, ggplot2::aes(x = t_start, y = required_techs)) +
+ggplot2::ggplot(staffing_df, ggplot2::aes(x = t_start, y = required_techs)) +
   ggplot2::geom_line(color = "#8b0000", linewidth = 1.2, direction = "vh") +
   ggplot2::geom_point(shape = 21, fill = "white", color = "#8b0000", size = 2, stroke = 1.2) +
   ggplot2::scale_x_reverse() + # Reverse X-axis so time counts down to the right
@@ -829,17 +774,7 @@ p <- ggplot2::ggplot(staffing_df, ggplot2::aes(x = t_start, y = required_techs))
     panel.grid.minor = ggplot2::element_blank(),
     plot.title = ggplot2::element_text(face = "bold")
   )
-
-ggplot2::ggsave(
-  filename = "figures/staffing-curve.png", 
-  plot = p, 
-  width = 6, 
-  height = 4, 
-  dpi = 150
-)
 ```
-
-![Prescriptive Staffing Curve: Minimum technicians required to guarantee $P(\text{Backlog}) \le 0.001$ as the inspection window compresses.](figures/staffing-curve.png){#fig-staffing-curve}
 
 
 As demonstrated in @fig-staffing-curve, the resulting capacity curve is highly non-linear. With a generous notice period (20 to 25 days), a small baseline crew of two technicians easily absorbs the transit friction and completes the repairs. However, dropping below the 15-day threshold triggers an exponential surge in labor demand. To prepare this property in under a week, simply authorizing overtime is mathematically insufficient; management must instantly deploy a coordinated team of over 20 technicians.
@@ -862,59 +797,46 @@ To quantify this temporal decay risk, $t_\text{end}$ was swept from 0 days (repa
 @fig-decay-score illustrates the erosion of the property's safety margin as this time gap widens.
 
 ```{r}
+#| label: fig-decay-score
+#| fig-cap: "Erosion of the Median and 5th Percentile ($P_{05}$) scores as the gap between prep completion and the inspection date widens."
+#| fig-width: 6
+#| fig-height: 4
 #| echo: false
 #| message: false
 #| warning: false
 
 sum_df_decay <- readRDS(here::here("results", "sensitivity", "t_end", "master_decay_study.rds"))
 
-p <- plot_sensitivity_multi(
+plot_sensitivity_multi(
   sum_df_decay, 
   y_vars = c("score_median", "score_p05"),
   param_label = "Days Finished Before Inspection (t_end)",
   y_label = "Score",
   title = "Impact of Post-Prep Decay on Score Confidence"
 )
-
-ggplot2::ggsave(
-  filename = "figures/decay-score.png", 
-  plot = p, 
-  width = 6, 
-  height = 4, 
-  dpi = 150
-)
 ```
-
-![Erosion of the Median and 5th Percentile ($P_{05}$) scores as the gap between prep completion and the inspection date widens.](figures/decay-score.png){#fig-decay-score}
 
 As visualized in @fig-decay-score, the score does not degrade at a steady, linear rate. Instead, the property exhibits strong resilience for the first three weeks, maintaining stable median and $P_{05}$ scores up to $t_\text{end} \approx 25$. Beyond 25 days, however, the score plunges rapidly. This indicates that temporal decay has a threshold effect: accumulating minor wear-and-tear is initially absorbable, but as time passes, the compounding probability of a critical life-safety system (e.g., a smoke detector or GFCI outlet) failing at random reaches a critical mass.
 
 @fig-decay-risk visualizes how this sudden score erosion translates into concrete regulatory failure.
 
 ```{r}
+#| label: fig-decay-risk
+#| fig-cap: "The compounding probability of regulatory failure caused by natural property decay during the post-prep waiting period."
+#| fig-width: 6
+#| fig-height: 4
 #| echo: false
 #| message: false
 #| warning: false
 
-p <- plot_sensitivity_multi(
+plot_sensitivity_multi(
   sum_df_decay, 
   y_vars = c("fail_risk_60", "critical_fail_risk_30"),
   param_label = "Days Finished Before Inspection (t_end)",
   y_label = "Probability",
   title = "Failure Risk Amplification over Time"
 )
-
-ggplot2::ggsave(
-  filename = "figures/decay-risk.png", 
-  plot = p, 
-  width = 6, 
-  height = 4, 
-  dpi = 150
-)
 ```
-
-![The compounding probability of regulatory failure caused by natural property decay during the post-prep waiting period.](figures/decay-risk.png){#fig-decay-risk}
-
 
 ### Conclusions:
 
@@ -965,28 +887,22 @@ tau_df <- ridges_df %>%
 ```
 
 ```{r}
+#| label: fig-tail-risk
+#| fig-cap: "Tail Risk Expansion. As the building deviates from perfect homogeneity, the left tail of the score distribution detaches from the median, maximizing the statistical risk of a catastrophic inspection."
+#| fig-width: 6
+#| fig-height: 4
 #| echo: false
 #| message: false
 #| warning: false
 
-p <- plot_sensitivity_multi(
+plot_sensitivity_multi(
   tau_df,
   y_vars = "tail_drop_median",
   param_label = "Proportion of Clean Tenants",
   y_label = "Tail Drop Median (\u03c4)",
   title = "Tail Risk Expansion (\u03c4) vs. Tenant Heterogeneity"
 )
-
-ggplot2::ggsave(
-  filename = "figures/tail-risk.png", 
-  plot = p, 
-  width = 6, 
-  height = 4, 
-  dpi = 150
-)
 ```
-
-![Tail Risk Expansion. As the building deviates from perfect homogeneity, the left tail of the score distribution detaches from the median, maximizing the statistical risk of a catastrophic inspection.](figures/tail-risk.png){#fig-tail-risk}
 
 Reading from right to left, as homogeneity breaks down, $\tau$ sharply increases, peaking near $p = 0.89$. This visualizes the core of the Lottery Effect: while the median score of the building remains relatively stable, the 5th percentile plummets. To understand the physical mechanisms driving this expansion—and its subsequent contraction at extreme heterogeneity—we must look at the physical defects themselves.
 
@@ -994,10 +910,19 @@ Reading from right to left, as homogeneity breaks down, $\tau$ sharply increases
 @fig-tenant-physics visualizes the physical state of the building prior to HUD scoring.
 
 ```{r}
+#| echo: false
 master_tenant_study <- readRDS(here::here("results", "sensitivity", "tenant_mix", "master_tenant_study.rds"))
 ```
 
 ```{r}
+#| label: fig-tenant-physics
+#| fig-cap: "The Physical Reality of Heterogeneity. As the building becomes more homogeneous (moving left to right), the spatial clustering of defects collapses (Plot B). The U-shape in total defects (Plot A) reveals the physical capacity limits of individual units."
+#| fig-subcap: 
+#|   - "Conservation of Defects"
+#|   - "Spatial Clustering Spike"
+#| layout-ncol: 2
+#| fig-width: 5
+#| fig-height: 4
 #| echo: false
 #| message: false
 #| warning: false
@@ -1020,31 +945,10 @@ p2 <- plot_sensitivity_metric(
   title = "B: Spatial Clustering Spike"
 )
 
-ggplot2::ggsave(
-  filename = "figures/tenant-physics-1.png", 
-  plot = p1, 
-  width = 5, 
-  height = 4, 
-  dpi = 150
-)
-
-ggplot2::ggsave(
-  filename = "figures/tenant-physics-2.png", 
-  plot = p2, 
-  width = 5, 
-  height = 4, 
-  dpi = 150
-)
+# Print both plots to trigger the subfigure layout
+p1
+p2
 ```
-
-::: {#fig-tenant-physics layout-ncol=2}
-
-![Conservation of Defects](figures/tenant-physics-1.png)
-
-![Spatial Clustering Spike](figures/tenant-physics-2.png)
-
-The Physical Reality of Heterogeneity. As the building becomes more homogeneous (moving left to right), the spatial clustering of defects collapses (Plot B). The U-shape in total defects (Plot A) reveals the physical capacity limits of individual units.
-:::
 
 The data reveals a statistical paradox driven by physical constraints (Plot A). As the proportion of clean tenants increases (reading left to right), the balancing equation forces a shrinking number of destructive units to carry the mathematical burden. These few units quickly hit a physical ceiling—a single apartment can only harbor so many broken items. Consequently, excess theoretical defects are truncated, artificially dropping the building's total defect count to a minimum near $p = 0.93$.
 
@@ -1055,28 +959,22 @@ Crucially, the SD of defect count per unit (Plot B) peaks before collapsing. Thi
 @fig-tenant-risk demonstrates how this physical clustering translates into regulatory failure.
 
 ```{r}
+#| label: fig-tenant-risk
+#| fig-cap: "The 'Lottery Effect' on Regulatory Risk. Despite having fewer overall defects, buildings with highly concentrated tenant damage experience a massive spike in inspection failure probability."
+#| fig-width: 6
+#| fig-height: 4
 #| echo: false
 #| message: false
 #| warning: false
 
-p <- plot_sensitivity_multi(
+plot_sensitivity_multi(
   master_tenant_study, 
   y_vars = c("fail_risk_60", "critical_fail_risk_30"),
   param_label = "Proportion of Clean Tenants",
   y_label = "Probability of Failure",
   title = "Failure Risk vs. Tenant Heterogeneity"
 )
-
-ggplot2::ggsave(
-  filename = "figures/tenant-risk.png", 
-  plot = p, 
-  width = 6, 
-  height = 4, 
-  dpi = 150
-)
 ```
-
-![The 'Lottery Effect' on Regulatory Risk. Despite having fewer overall defects, buildings with highly concentrated tenant damage experience a massive spike in inspection failure probability.](figures/tenant-risk.png){#fig-tenant-risk}
 
 Despite the highly heterogeneous building containing fewer total physical defects than the perfectly homogeneous baseline, its probability of regulatory failure nearly quadruples (spiking from ~2.5% to ~9.5%).
 
@@ -1087,21 +985,8 @@ Despite the highly heterogeneous building containing fewer total physical defect
 **Targeted Pre-Inspections**: A property with fewer total defects but high clustering is statistically more dangerous than a uniformly degraded property. If management is aware of specific high-impact tenants, those specific units must be audited and repaired at a 100% catch rate prior to the inspection, as they pose a disproportionate threat. A potential way to proactively identify these "dirty" units is to look for historically low rates of tenant service requests, which often mask severe deferred maintenance.
 
 
-# 10. Key Lessons Learned
 
-The preceding simulations frame property maintenance as a stochastic operations research problem, highlighting the rigid physical constraints that govern an NSPIRE inspection. Crucially, the model demonstrates the necessity of incorporating physical realities—such as the transit friction incurred when technicians move between units (Section 8)—rather than relying solely on raw labor hours. Through this mathematical proof of concept, several core operational realities emerge, even though they were not explicitly encoded in the modeling:
-
-* **Quality Assurance has a Strict Baseline ($\alpha_\text{audit}$)**: Quality control is not a linear scale. Audit efforts that intercept less than 25% of defects are mathematically invisible to the final score. To confidently eliminate the risk of regulatory failure, the internal audit process must successfully detect and resolve at least 90% of all pre-existing defects.
-
-* **The False Economy of Time Compression ($t_\text{start}$)**: Reducing preparation time does not increase efficiency; it forces a physical labor threshold that converts necessary maintenance into an abandoned backlog. Pushing a baseline 5-technician crew beyond its maximum output (around Day 22) results in a total operational collapse, trading immediate overtime savings for guaranteed regulatory failure.
-
-* **Non-Linear Labor Scaling (Crew Size vs. $t_\text{start}$)**: The relationship between a shrinking inspection window and required labor is exponential, not proportional. Halving a preparation schedule from 14 days to 7 days does not simply double the required workforce; it multiplies it by a factor of six to overcome transit friction and spatial lockouts.
-
-* **The "Goldilocks" Preparation Constraint ($t_\text{end}$)**: Because residential properties are entropic, maintenance teams cannot simply finish preparations as early as possible. Properties exhibit an exponential spike in failure risk if left idle beyond 25 days post-repair. Success requires precise, "just-in-time" scheduling: starting early enough to avoid capacity exhaustion, but finishing late enough to avoid natural property decay.
-
-* **The Lottery Effect of Tenant Heterogeneity ($p$, $\tau$)**: NSPIRE's sampling protocol severely punishes spatial clustering. A property with heavily concentrated damage in just a few units is statistically more dangerous than a uniformly degraded building, even if the total defect count is lower. Management could proactively audit "quiet" units with historically low service requests, as this silence often masks the severe, localized defects that trigger catastrophic sampling failure.
-
-# 11. References
+# 10. References
 
 ::: {#refs}
 :::
@@ -1448,6 +1333,23 @@ kable(scripts_df, align = c('l', 'l', 'l'))
 #| code: !expr readLines("../results/sensitivity/t_end/Decay.R")
 ```
 
+### B.2.4 TenantMix.R
+
+```{r}
+#| eval: false
+#| echo: true
+#| code: !expr readLines("../results/sensitivity/tenant_mix/TenantMix.R")
+```
+
+### B.2.4 RunSolver.R
+
+```{r}
+#| eval: false
+#| echo: true
+#| code: !expr readLines("../results/sensitivity/t_start/RunSolver.R")
+```
+
+
 <style>
 .floating-copyright {
   position: fixed;
@@ -1464,5 +1366,5 @@ kable(scripts_df, align = c('l', 'l', 'l'))
 </style>
 
 <div class="floating-copyright">
-  &copy; 2026 Joël R. Pradines.<br> All rights reserved.
+  &copy; 2026 Joël R. Pradines.
 </div>

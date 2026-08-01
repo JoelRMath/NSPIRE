@@ -11,6 +11,7 @@ format:
     math: true
     embed-resources: true
     highlight-style: tango
+    link-external-newwindow: true
 bibliography: references.bib
 nocite: |
   @*
@@ -36,11 +37,11 @@ library(patchwork)
 
 Preparing a property for a HUD NSPIRE inspection is a complex operational challenge governed by rigid constraints: labor limits, task dependencies, and tenant behavior.
 
-This document presents a data-driven approach to optimizing this pre-inspection workflow. By leveraging Monte Carlo simulation, we execute thousands of "virtual inspections." This stochastic engine stress-tests a property's risk profile, bridging ground-level maintenance realities with probabilistic modeling. To enforce the physical laws of maintenance, the workflow is mapped as a Directed Acyclic Graph (DAG) (@sec-dag), ensuring tasks sequence correctly and temporal lockouts are respected.
+This document presents a data-driven approach to optimizing this pre-inspection workflow. By leveraging Monte Carlo simulation, we execute thousands of "virtual inspections." This stochastic engine stress-tests a property's risk profile, bridging ground-level maintenance realities with probabilistic modeling. To enforce the physical laws of maintenance, the workflow is mapped as a Directed Acyclic Graph (DAG) to guarantee proper task sequencing and compliance with temporal lockouts (@sec-dag).
 
-Because the model is driven by modular configuration files—defining specific maintenance tasks, building floor plans, labor scenarios, and scoring schemes—it is highly adaptable and can easily generate tailored baseline estimates for any given property. However, its strategic value goes beyond forecasting a score distribution. Rather, its immediate value is highly prescriptive: it isolates the mathematical architecture of an inspection to identify critical operational levers and their failure thresholds."
+Because the model is driven by modular configuration files—defining specific maintenance tasks, building floor plans, labor scenarios, and scoring schemes—it is highly adaptable and can easily generate tailored baseline estimates for any given property. However, its strategic value goes beyond forecasting a score distribution. Its greatest value is prescriptive: it isolates the mathematical architecture of an inspection to identify critical operational levers and their failure thresholds.
 
-Ultimately, this document serves as a proof-of-concept for the utility of quantitative analysis in property management. By mapping the interaction of time, labor, and probability, it demonstrates how raw operational data can be translated into definitive directives—identifying staffing requirements, exposing the limits of overtime, and defining the timelines required to guarantee regulatory compliance.
+Ultimately, this document serves as a proof-of-concept for the utility of [Operations Research](https://www.informs.org/Explore/Operations-Research-Analytics) in property management. By mapping the complex mathematical interactions between time, labor, and probability, it demonstrates how raw data is translated into operational directives—identifying staffing requirements, exposing the physical limits of overtime, and defining the timelines needed to guarantee regulatory compliance.
 
 Specifically, the simulation reveals the following key findings. Importantly, these insights were not explicitly programmed into the model; rather, they emerged as consequences of complex component interactions:
 
@@ -49,397 +50,12 @@ Specifically, the simulation reveals the following key findings. Importantly, th
 *   **The Overtime Illusion:** Capital cannot infinitely solve scheduling crunches. Compressing preparation timelines below 15 days forces the workforce into a "backlog cliff." At this threshold, authorizing maximum capital expenditure on overtime cannot prevent regulatory failure (@fig-time-crunch-labor and @fig-time-crunch-backlog).
 *   **Non-Linear Staffing Surges:** Shortened inspection notices cannot be mitigated simply by authorizing more hours. Because of strict task dependencies and spatial lockouts, compressed timelines demand an exponential surge in active headcount to execute parallel workflows. For example, halving a preparation schedule from 14 days to 7 days does not simply double the required workforce; it multiplies it by a factor of six (@fig-staffing-curve).
 *   **The Post-Prep Decay Penalty:** Completing repairs too early introduces significant physical decay risk. Crucially, this decay does not accumulate gradually; it behaves as a strict mathematical threshold. The model reveals an approximate 20-day "grace period" where median scores remain stable and the probability of failure stays near zero. However, immediately following this window, the property faces a sharp acceleration in defect re-emergence. Score confidence erodes significantly—with the 5th percentile worst-case score dropping steeply—and failure probabilities rise exponentially. Success therefore requires precise, "just-in-time" scheduling: preparations should start early enough to avoid capacity exhaustion, but finish late enough to stay safely within this pre-inspection decay threshold (@fig-decay-score and @fig-decay-risk).
-*   **The Lottery Effect:** HUD’s random sampling protocol severely penalizes spatial variance. A handful of highly destructive tenants in an otherwise pristine building triples the probability of a catastrophic inspection failure. To neutralize this threat, management could aggressively target high-risk units during the internal audit, using low historical service request rates as a predictive proxy for hidden defects (@fig-tenant-risk).
+*   **The Lottery Effect:** HUD’s random sampling protocol severely penalizes spatial variance. A handful of highly destructive tenants in an otherwise pristine building triples the probability of a catastrophic inspection failure (@fig-tenant-risk). To neutralize this threat, management could aggressively target high-risk units during the internal audit. We hypothesize that "silent" units—those with unusually low historical service request rates—serve as a strong predictive proxy for these hidden defects. Validating this operational hypothesis represents a high-value opportunity for future analysis, requiring integration with live property management databases to empirically mine historical work-order data.
 
-"The following sections explore the operational realities exposed by these simulations, detailing the specific thresholds where standard preparation strategies fail. For readers interested in the structural logic of the model, the mathematical architecture and simulation mechanics—including the Directed Acyclic Graph (DAG) workflow mapping—are detailed in Section X, prior to the appendices."
+The following sections explore the results obtained with simulations, detailing the specific thresholds where standard preparation strategies fail. For readers interested in the structural logic of the model, the mathematical architecture and simulation mechanics—including the Directed Acyclic Graph (DAG) workflow mapping—are detailed in Section 8, prior to the appendices, which provide modeling parameters and simulator code.
 
-# 2. The NSPIRE Scoring Mechanism
 
-The inspection divides a property into distinct locations and evaluates defects based on severity. 
-
-## 2.1. Definitions and Sets
-
-* **Severity:** $s \in \{\text{LT}, \text{S}, \text{STD}\}$ (Life-Threatening, Severe, Standard)
-* **Location:** $l \in \{\text{Unit}, \text{Inside}, \text{Outside}\}$
-* $N$: Total number of units in the property.
-* $n(N)$: The HUD-mandated sample size function, where $n$ is a discrete function of $N$.
-* $C_{s,l}$: True total count of defects existing in the property.
-* $c_{s,l}$: Observed count of defects recorded during the inspection.
-* $w_{s,l}$: Static point weight (penalty) assigned to a defect.
-
-## 2.2. Deduction Function
-
-The total point deduction $D$ is a summation over all severities and locations. For Unit locations, the observed defects are normalized by the sample size $n(N)$, which effectively scales the deduction based on the inspection tier:
-
-$$D = \sum_{s} \sum_{l \in \{\text{Inside}, \text{Outside}\}} (c_{s,l} \cdot w_{s,l}) + \sum_{s} \left( \frac{c_{s,\text{Unit}}}{n(N)} \cdot w_{s,\text{Unit}} \right)$$
-
-## 2.3. Raw Continuous Score
-
-The base score originates at 100 and is bounded at zero using the Heaviside step function $H(x)$:
-
-$$S_{raw} = (100 - D) \cdot H(100 - D)$$
-which is a negative "kill-switch" defined by
-$$H(x) = \begin{cases} 1 & \text{if } x \ge 0 \\ 0 & \text{otherwise} \end{cases}$$
-
-
-## 2.4. Operational Compliance Function (Failsafe)
-
-A score $\ge 60$ mathematically passes, but the presence of **any** Life-Threatening (LT) defect forces an immediate 24-hour mitigation compliance failure. Let $n_{LT}$ represent the total observed LT defects:
-
-$$n_{LT} = \sum_{l} c_{\text{LT},l}$$.
-
-We model this regulatory mandate as a mathematical "kill switch" called the Heaviside function $H(x)$ and defined above. Namely, if even one LT defect is observed ($n_{LT} \ge 1$), the term $(0.5 - n_{LT})$ becomes negative. This drives the function to output a zero, instantly failing the property regardless of its raw score:
-$$S_{eff} = S_{raw} \cdot H(0.5 - n_{LT})$$
-
-# 3. Probabilistic Sampling and Realizations
-
-The inspection score is not a single, guaranteed number (a deterministic value). Instead, it is a **random variable**, representing the final outcome of many smaller random events—much like rolling a pair of dice. For example, whether the kitchen GFCI in Unit 1 happens to break today is a random event; whether the HUD inspector randomly chooses to inspect Unit 1 is another.
-
-Because of this randomness, running a single simulation (rolling the dice once) is not very informative. However, by running thousands of virtual inspections, called Monte Carlo simulations, we can build a complete score distribution. This allows us to move beyond guessing and mathematically estimate probabilities, such as the risk of failing the inspection (scoring below 60).
-
-## 3.1. Stochastic Unit Sampling
-
-HUD inspection protocols dictate that units are randomly sampled. For a property with $N$ total units, the inspector chooses a subset $n(N)$ based on the tiered sampling schedule defined in Table 1.
-
-```{r}
-#| label: tbl-hud-sampling
-#| tbl-cap: "HUD NSPIRE Tiered Sampling Schedule"
-#| echo: false
-#| warning: false
-#| message: false
-
-library(DT)
-
-# 1. Base Data
-hud_sampling <- data.frame(
-  `Total Units (N)` = c("1–5", "6–7", "8", "9–10", "11–12", "13–14", "15–16", "17–18", 
-                        "19–21", "22–24", "25–27", "28–30", "31–35", "36–39", "40–45", 
-                        "46–51", "52–59", "60–67", "68–78", "79–92", "93–110", "111+"),
-  `Inspected Units (n)` = c("All units", "6", "7", "8", "9", "10", "11", "12", "13", 
-                            "14", "15", "16", "17", "18", "19", "20", "21", "22", "23", 
-                            "24", "25", "32"),
-  check.names = FALSE
-)
-
-# 2. Define mathematical boundaries
-min_n <- c(1, 6, 8, 9, 11, 13, 15, 17, 19, 22, 25, 28, 31, 36, 40, 46, 52, 60, 68, 79, 93, 111)
-max_n <- c(5, 7, 8, 10, 12, 14, 16, 18, 21, 24, 27, 30, 35, 39, 45, 51, 59, 67, 78, 92, 110, 500)
-
-# 3. Create the hidden search index string (e.g., "25 26 27")
-hud_sampling$SearchTerms <- mapply(function(start, end) {
-  paste(seq(start, end), collapse = " ")
-}, min_n, max_n)
-
-# 4. Render Interactive Table with custom Regex search
-datatable(
-  hud_sampling,
-  options = list(
-    pageLength = 8,
-    dom = 'ftp', 
-    autoWidth = TRUE,
-    columnDefs = list(
-      list(className = 'dt-center', targets = 0:1),
-      list(visible = FALSE, targets = 2) # Hide the search string
-    ),
-    # Inject JavaScript to wrap the user's input in word boundaries (\b)
-    initComplete = JS(
-      "function(settings, json) {",
-      "  var dt = this.api();",
-      "  $('.dataTables_filter input').unbind().on('keyup', function(e) {",
-      "    var val = this.value.trim();",
-      "    if(val) {",
-      "      dt.search('\\\\b' + val + '\\\\b', true, false).draw();",
-      "    } else {",
-      "      dt.search('').draw();",
-      "    }",
-      "  });",
-      "}"
-    )
-  ),
-  rownames = FALSE,
-  class = 'cell-border stripe hover'
-)
-```
-
-In massive high-rise properties ($N > 100$), the inspection score tends to be highly stable because extreme outcomes naturally "average out" (Law of Large Numbers). However, for small to mid-sized properties ($N \leq 50$), this random sampling creates much larger relative variations. Because the inspector is pulling a random handful of units, the defects they happen to stumble upon ($c_{s,\text{Unit}}$) can be drastically better or worse than the actual overall condition of the building ($C_{s,\text{Unit}}$). This "luck of the draw" drives the wide spread of possible final scores in small to mid-sized properties.
-
-## 3.2. Realization of Deductions
-
-Let $I_{u}$ be an indicator variable for unit $u$, that is, $I_u = 1$ if unit $u$ is selected for inspection, and $0$ otherwise. The observed defect count $c_{s,\text{Unit}}$ for a specific simulation realization $\omega$ is defined by the subset of selected units:
-
-$$c_{s,\text{Unit}}(\omega) = \sum_{u=1}^{N} I_u(\omega) \cdot \mathbb{1}(\text{unit } u \text{ has defect } s)$$
-where $\mathbb{1}(\text{statement})$ is 1 if $\text{statement}$ is true and 0 otherwise.
-
-The model calculates the realization $D(\omega)$ for each simulation $k$ in the Monte Carlo ensemble. The set of all realizations records the variance, inherent in the sampling process, which is the primary driver of the "lottery effect" in mid-sized properties.
-
-## 3.3. Task Execution Times and Mixture Distributions
-
-Just as the inspector's choice of units is random, the time required to complete a maintenance task is never a fixed number.
-
-To model this physical reality, we treat execution time $t_i$ as a random variable drawn from a bounded Beta-PERT (Program Evaluation and Review Technique) distribution. PERT is widely used in project management because it relies on three intuitive estimates: an optimistic minimum ($a$), a most likely mode ($m$), and a pessimistic maximum ($b$).
-
-However, tasks often exist in distinctly different physical states. Consider a sink drain: it might simply require a quick manual adjustment by a technician (State 1), or it might require a licensed plumber to replace the downstream PVC P-trap (State 2). To account for this, the execution time $t_i$ is drawn from a mixture distribution, weighted by the physical probability of each state ($p_{i,k}$):
-$$f(t_i) = \sum_{k} p_{i,k} \cdot \text{PERT}(t; a_k, m_k, b_k)$$
-Using a single "average time" for such a task would be an operational disaster, as it would plan for an event that never actually happens. As illustrated in @fig-multimodal-pert, the mixture distribution correctly captures the bifurcated reality of the repair.
-
-```{r}
-#| label: fig-multimodal-pert
-#| fig-cap: "Example of a Bimodal Mixture Distribution. The mathematical 'average' time falls in a dead zone, highlighting why stochastic modeling is required for accurate labor planning."
-#| fig-width: 8
-#| fig-height: 4
-#| echo: false
-#| message: false
-#| warning: false
-
-library(ggplot2)
-library(dplyr)
-
-# Custom PERT density function to avoid extra package dependencies
-dpert <- function(x, a, m, b) {
-  alpha <- 1 + 4 * (m - a) / (b - a)
-  beta <- 1 + 4 * (b - m) / (b - a)
-  stats::dbeta((x - a) / (b - a), alpha, beta) / (b - a)
-}
-
-# Define the two states for the plumbing example
-x <- seq(0, 120, length.out = 500)
-state1 <- dpert(x, a = 5, m = 15, b = 30) * 0.70  # Tech adjustment (70% probability)
-state2 <- dpert(x, a = 45, m = 70, b = 110) * 0.30 # Plumber PVC fix (30% probability)
-mixture <- state1 + state2
-
-df <- data.frame(Time = x, Density = mixture)
-mean_time <- sum(df$Time * df$Density) / sum(df$Density)
-
-ggplot(df, aes(x = Time, y = Density)) +
-  geom_area(fill = "#4e79a7", alpha = 0.6) +
-  geom_line(color = "#2c4663", linewidth = 1) +
-  geom_vline(xintercept = mean_time, color = "#e15759", linetype = "dashed", linewidth = 1) +
-  annotate("text", x = 15, y = max(df$Density) * 0.6, label = "State 1:\nTech Adjustment", size = 4) +
-  annotate("text", x = 75, y = max(df$Density) * 0.4, label = "State 2:\nPlumber PVC Fix", size = 4) +
-  annotate("text", x = mean_time + 2, y = max(df$Density) * 0.9, label = "Mean Time\n(Danger Zone)", color = "#e15759", hjust = 0, size = 4) +
-  theme_minimal(base_size = 14) +
-  labs(
-    title = "Mixture Distribution of Execution Time",
-    x = "Execution Time (Minutes)",
-    y = "Probability Density"
-  ) +
-  theme(panel.grid.minor = element_blank())
-```
-
-By mapping these mixture distributions across the entire property, we build a comprehensive dictionary of constraints. The complete operational matrix—detailing baseline defect rates, multi-state PERT parameters, material costs, and prerequisite dependencies—is defined in @tbl-tasks-config.
-
-This master configuration encodes tasks realities into the simulation engine. For example, it explicitly maps the physical handoffs between internal technicians adjusting standard sink drains and licensed plumbers replacing downstream PVC P-traps via vendor flags and scheduling lags. 
-
-When using the interactive table below, expanding the arrow at the left of any task reveals the exact time, cost, and probability parameters driving its Monte Carlo realizations.
-
-
-```{r}
-#| label: tbl-tasks-config
-#| tbl-cap: "NSPIRE Task Modalities and Execution Constraints. Task categories map to core operational domains: FS (Fire Safety), EL (Electrical), PL (Plumbing), VA (Ventilation & Appliances), DW (Doors, Windows & Millwork), and SU (Surfaces). Clicking on the row arrow will display PERT, cost and decay parameters."
-#| echo: false
-#| warning: false
-#| message: false
-
-# Load the required libraries
-library(DT)
-library(readr)
-
-# Read the CSV
-tasks_df <- read_csv("../inst/extdata/tasks_config.csv")
-
-# Generate and print the interactive table
-datatable(
-  tasks_df,
-  extensions = c('FixedColumns', 'Responsive'),
-  options = list(
-    pageLength = 10,
-    scrollX = TRUE,
-    fixedColumns = list(leftColumns = 5), 
-    autoWidth = TRUE,
-    columnDefs = list(
-      list(className = 'dt-center', targets = "_all")
-    )
-  ),
-  class = 'cell-border stripe hover'
-)
-```
-
-
-## 3.4. Post-Audit Asset Decay
-
-A final, critical parameter embedded within the master configuration (@tbl-tasks-config) is the baseline decay rate (p_decay). In residential properties, a resolved defect does not stay resolved indefinitely. Once a repair is completed and audited at time $t_{end}$, the asset immediately re-enters a state of stochastic wear-and-tear.
-
-We model this defect re-emergence as a Bernoulli (i.e. binary) process over the waiting period $\delta_{decay}$ (the time gap between the completion of the repair and the arrival of the HUD inspector). Given a baseline daily probability of failure $\lambda_{i}$ for task $i$, the probability $P_{redefect}$ that a newly resolved task breaks again before the inspection is:
-$$P_{redefect} = 1 - (1 - \lambda_{i,u}^*)^{\delta_{decay}}$$
-Crucially, this decay is not uniform across the property. The effective daily probability of failure $\lambda_{i,u}^*$ is coupled with the unit's latent state $\phi_u$. This mathematical multiplier actively accelerates the re-emergence of defects in high-impact ("dirty") units:$$\lambda_{i,u}^* = \lambda_{i} \cdot \phi_u$$This temporal decay creates a severe operational trade-off. Finishing preparations too early maximizes the decay window ($\delta_{decay}$), inflating the probability that critical life-safety items (like a smoke detector or GFCI) will randomly fail before the inspector arrives. Conversely, starting preparations too late constricts the repair window, ensuring a labor backlog.
-
-Beyond stochastic time estimates and decay rates, the master configuration table (@tbl-tasks-config) contains one more vital operational constraint: the prerequisites column. Real-world maintenance cannot be executed in a random order. To enforce the physical sequence of repairs, the simulation translates these prerequisites into a Directed Acyclic Graph (DAG), enforcing the rigid "order of operations" required to prep a unit.
-
-# 4. Resource Mapping and Graph Topology (DAG){#sec-dag}
-
-Repairs cannot always happen simultaneously or in random order. For example, you cannot paint a wall before patching the drywall, and you cannot patch the drywall before fixing the plumbing leak behind it.
-
-To model this operational reality, we organize maintenance tasks into a Directed Acyclic Graph (DAG). In simpler terms, a DAG is a strict, one-way flowchart that maps out the required "order of operations." Each task (mathematically called a vertex, $V_i$) requires an expected execution time $t_i$ and a material cost $m_i$.
-
-```{mermaid}
-%%| fig-cap: "A simple Directed Acyclic Graph (DAG) illustrating mandatory task sequences."
-flowchart LR
-    A[Fix Plumbing Leak] --> B[Patch Drywall]
-    B --> C[Wait for Compound to Dry]
-    C --> D[Paint Wall]
-    
-    style A fill:#f9f9f9,stroke:#333,stroke-width:2px
-    style B fill:#f9f9f9,stroke:#333,stroke-width:2px
-    style C fill:#ffe6cc,stroke:#d79b00,stroke-width:2px,stroke-dasharray: 5 5
-    style D fill:#f9f9f9,stroke:#333,stroke-width:2px
-```
-
-When applied to the entire NSPIRE catalog, the complexity of maintenance becomes more apparent. In @fig-dag-network below, the algorithm scales the size of each node by its mathematical out-degree: the number of downstream tasks that physically depend on it.
-
-Massive nodes represent bottlenecks. For example, EL-02 (the Breaker Box) acts as a massive prerequisite hub. If this root node is not cleared first, it initiates a cascading scheduling freeze, preventing technicians from executing subsequent tasks like GFCI replacements, exhaust fan repairs, or lighting installations.
-
-```{r}
-#| label: fig-dag-network
-#| fig-cap: "The complete maintenance DAG. Node size indicates bottleneck severity. Hover over any node to view the full task description. Use the top control in the right corner to reset the view. Categories of tasks: FS (Fire Safety), EL (Electrical), PL (Plumbing), VA (Ventilation & Appliances), DW (Doors, Windows & Millwork), and SU (Surfaces)"
-#| echo: false
-#| warning: false
-#| message: false
-
-library(igraph)
-library(visNetwork)
-
-# 1. Load the DAG and Configuration
-dag_csv <- "../inst/extdata/tasks_config.csv"
-dag_obj <- create_inspection_dag(dag_csv)
-g <- dag_obj@graph
-tasks_df <- dag_obj@tasks_config
-
-# 2. Build Interactive Nodes Dataframe
-nodes <- data.frame(id = V(g)$name, label = V(g)$name)
-
-# Match node IDs to config to extract categories and descriptions
-idx <- match(nodes$id, tasks_df$task_id)
-nodes$group <- tasks_df$category[idx]
-
-# Create the tooltip (HTML formatted)
-nodes$title <- paste0("<p><b>", tasks_df$task_id[idx], "</b><br>", 
-                      tasks_df$description[idx], "</p>")
-
-# Calculate out-degree for node sizing
-out_deg <- degree(g, mode = "out")
-nodes$value <- out_deg + 1 
-
-# 3. Build Interactive Edges Dataframe
-edges <- igraph::as_data_frame(g, what = "edges")
-
-# 4. Render Interactive Graph
-visNetwork(nodes, edges, width = "100%", height = "600px") |>
-  visIgraphLayout(layout = "layout_with_fr", randomSeed = 42) |>
-  visEdges(arrows = "to", color = list(color = "#a9a9a9"), smooth = FALSE) |>
-  visNodes(
-    font = list(size = 20, face = "sans", color = "black"),
-    borderWidth = 1
-  ) |>
-  visOptions(
-    highlightNearest = list(enabled = TRUE, degree = 1, hover = FALSE),
-    nodesIdSelection = TRUE # Dropdown menu to search for specific nodes
-  ) |>
-  # Adds the navigation and reset controls
-  visInteraction(navigationButtons = TRUE)
-```
-
-
-## 4.1. Edge Constraints (Operational Laws)
-
-The arrows connecting these tasks are not just visual lines; they act as rigid operational laws within the simulation engine.
-
-* **Sequential Precedence**: A directed edge $V_A \to V_B$ requires the start time of $B$ to be $\ge$ the end time of $A$.
-  * Example: A technician cannot paint a wall before the drywall compound has fully dried.
-
-* **Temporal Blocking**: Certain vertices impose a local resource freeze, locking a spatial node for a time interval $\Delta t$.
-  * Example: If an external vendor reglazes a tub that physical zone is locked out for a mandatory cure time. The scheduling engine forces internal technicians to re-route to other tasks or units.
-
-* **Mutually Exclusive Pruning**: If a higher-order vertex $V_{replace}$ is activated, redundant child vertices $V_{repair}$ are mathematically pruned ($t_{repair} \to 0$).
-  * Example: If an upper kitchen cabinet is critically broken and flagged for full replacement, the system instantly cancels minor, redundant adjustments to its hinges or doors, preventing the budget from absorbing phantom labor hours.
-
-
-# 5. Execution Capacity and Quality Control
-
-Even with a perfectly sequenced DAG, execution is bound by strict physical limits: the time available to work, the reliance on external vendors, and the inevitability of human error.
-
-## 5.1. Repair Capacity and Vendor Bottlenecks
-
-The model assumes a maintenance repair window defined by $t_{start}$ (commencement of internal repairs) and $t_{end}$ (completion of repairs and audit). Given a standard baseline labor capacity $R_{base}$ (hours/unit/day), the total labor capacity $\text{Cap}$ available for the maintenance cycle is linearly proportional to the duration of this window:
-$$\text{Cap} = R_{base} \cdot (t_{start} - t_{end})$$
-Tasks requiring labor hours $T_{total} > \text{Cap}$ result in a scheduling backlog, forcing the system to abandon lower-severity items to prioritize high-penalty (LT/S) defects.
-
-This capacity is further choked by tasks requiring external licensing. For example, while a technician handles a sink drain, repairing the downstream PVC P-trap requires a licensed plumber. When a node evaluates to this severe state, internal labor drops to zero ($t_{internal} \to 0$), but a schedule lag is injected based on a Uniform distribution: $L \sim \text{Uniform}(l_{min}, l_{max})$ days. Furthermore, a mandatory spatial lockout is triggered (e.g., a 24-hour cure time after glazing), forcing the DAG to re-route technicians and accelerating the exhaustion of the remaining timeline.
-
-## 5.2. Human Error and Audit Efficacy
-
-Execution of a task does not guarantee absolute resolution. A task has a baseline physical probability ($p_{err}$) of being missed or improperly repaired. We quantify quality control using a formal internal audit efficacy parameter, $\alpha_\text{audit} \in [0, 1]$, representing the probability that the pre-inspection internal team detects and successfully mitigates a surviving defect.
-
-* **Serial Execution (Single Technician)**: The probability that a defect survives the initial repair attempt and remains undetected by the audit phase is:
-$$P(\text{Survive}) = (1 - \alpha_\text{audit}) \cdot p_{err}$$
-
-* **Parallel Execution (Dual Technicians)**: Applying the "Four Eyes" principle, independent cross-checking drastically reduces error. The joint probability of both technicians missing the defect becomes:$$P(\text{Survive}) = (1 - \alpha_\text{audit}) \cdot p_{err}^2$$
-
-# 6. Tenant Heterogeneity and Predictive Risk
-
-Asset deterioration is not uniform across a property. Baseline probabilities assume a standard deterioration rate, but operational reality dictates that damage clusters around specific tenant behaviors.
-
-## 6.1. The Bimodal Risk of Tenant Behavior
-
-We model unit "cleanliness" as a bimodal latent state $\phi_u$ for each unit $u$, representing the inherent maintenance burden generated by the tenant. The tenant impact multiplier $\phi_u$ is drawn from a mixture distribution:
-$$\phi_u \sim \begin{cases} \phi_{clean}, & \text{with probability } (1 - \pi) \\ \phi_{dirty}, & \text{with probability } \pi \end{cases}$$
-Where $\pi$ is the estimated proportion of high-impact units in the property.
-Note that the default simulation parameters assume tenant homogeneity. The effect of a two-valued $\phi_u$ is examined only in section 9.5.
-
-## 6.2. The Danger of Silence (Latent Covariates)
-
-A lack of historical tenant reporting often masks severe deferred maintenanc. To combat this, we use historical service request volume $W_u$ as a proxy to infer the probability that a unit belongs to the high-impact "dirty" latent state ($\phi_{dirty}$).
-
-We can define the unit-specific probability $\pi_u$ as a logistic function of service requests $W_u$:
-$$\pi_u = P(\phi_u = \phi_{dirty} \vert{} W_u) = \text{logit}^{-1}(\alpha - \beta W_u)$$
-Where $\alpha$ and $\beta$ are calibrated tuning parameters. For units with extremely low reporting ($W_u \to 0$), the prior probability of being in the "dirty" state dramatically increases, signaling a high likelihood of latent defects.
-
-**This feature is not used in this document**. Exploring it would be an interesting exercise but it would certainly require access to actual tenant data.
-
-# 7. Risk Analysis
-
-Moving beyond deterministic score projections, this model quantifies operational risk by treating property performance as a stochastic process. By leveraging Monte Carlo simulation, we assess not only the expected outcome but the probability of regulatory non-compliance.
-
-## 7.1. Quantification of Failure Risk
-
-We define the failure event as $S_{eff} < 60$. Due to the non-linear interaction of random unit sampling, defect emergence probabilities, and repair quality, the effective inspection score $S_{eff}$ is a random variable. We estimate the probability of failure ($P_{fail}$) by simulating $K = 1,000$ independent inspection realizations:
-$$P_{fail} = \frac{1}{K} \sum_{i=1}^{K} I(S_{eff,i} < 60)$$
-where $I(\cdot)$ is again the indicator function. This allows us to map the property's risk profile against the HUD enforcement threshold, providing a granular view of the likelihood of catastrophic failure that a mean-based score effectively masks.
-
-## 7.2. Quantifying Volatility 
-
-Standard deviation ($\sigma$) and the Coefficient of Variation ($CV = \sigma/\mu$) provide a global measure of dispersion. However, in NSPIRE compliance, the right tail (scores $> 100$) is truncated, and the distribution is often skewed. The primary risk resides in the left tail—the possibility of a "bad day" where HUD sampling captures a concentrated cluster of high-severity defects. To quantify this downside volatility, we define the **Tail Drop Metric** ($\tau$):
-
-$$\tau = \frac{\text{med} - P_{05}}{\text{med}}$${#eq-tau}
-
-Where:
-
-* $\text{med}$ is the median score
-* $P_{05}$ is the 5th percentile of the simulated scores (the "Value at Risk").
-
-$\tau$ represents the percentage degradation from expected performance to the worst-case scenario. 
-
-A property may exhibit a high median score while maintaining a high $\tau$, identifying it as a "lottery" asset—stable on average, but highly susceptible to non-linear drops in score due to the interaction of unit sampling variance and tenant-driven decay.
-
-## 7.3. Sensitivity Mapping
-
-The Tail Drop Metric $\tau$ is a systemic output of our model, functionally defined by the interaction of our control and stochastic parameters:
-
-$$\tau = f(n(N), \alpha_\text{audit}, \pi, \phi_{dirty})$$
-
-This sensitivity function captures how variance in the HUD sampling tier $n(N)$, human error in pre-inspection audit ($\alpha_\text{audit}$), and the underlying distribution of tenant impact ($\pi, \phi_{dirty}$) propagate into downside performance risk. The following numerical investigations isolate these partial derivatives to determine which operational parameters dominate the variance in the $P_{05}$ left tail.
-
-
-# 8. Operational Reality: The Transit Friction Tax {#sec-friction}
+# 2. Operational Reality: The Transit Friction Tax {#sec-friction}
 
 Theoretical models that treat technicians as perfect, frictionless robots are likely to provide unrealistic time estimates. Standard algorithmic approaches would calculate only pure "wrench time"—the isolated minutes required to physically execute a repair. This fundamentally ignores the physical and human constraints of moving labor through a segmented residential environment.
 
@@ -452,7 +68,7 @@ To quantify the macroeconomic impact of these human constraints, the simulation 
 
 ```{r}
 #| label: fig-transit-friction
-#| fig-cap: "Transit Friction: including short breaks after a unit task (~5min) and slightly longer ones (~15min) when swiching to a different unit induces a 34.2% tax time."
+#| fig-cap: "Transit Friction: including short breaks after a unit task (~5min) and slightly longer ones (~15min) when switching to a different unit induces a 34.2% time tax."
 #| fig-width: 9
 #| fig-height: 6
 #| echo: false
@@ -490,13 +106,12 @@ ggplot(plot_data, aes(x = Total_Hours, fill = Scenario, color = Scenario)) +
 
 **Budgetary Blind Spot**: If management calculates staffing requirements, prep timelines, or overtime budgets based solely on idealized task lists, the property is instantly under-resourced by a third. Optimizing execution requires scheduling algorithms that prioritize spatial clustering, keeping technicians in a single unit as long as possible to suppress this hidden tax.
 
-# 9. Parameter Sensitivity Analysis
+# 3. Audit Catch Rate ($\alpha_\text{audit}$)
 
 Sensitivity analysis studies how variations in control parameters drive system outcomes, such as expected score, labor costs, and downside risk ($P_{fail}$ and $\tau$). By studying these variables across parameter ranges, one can identify parameter critical ranges, non-linear thresholds and propose optimal resource allocations within the NSPIRE framework.
 
-## 9.1. Audit Catch Rate ($\alpha_\text{audit}$)
-
-The internal pre-inspection audit is modeled by $\alpha_\text{audit}$, the probability that a defect is identified and resolved prior to the HUD inspection. To quantify the impact of audit efficacy on compliance risk, $\alpha_\text{audit}$ was varied from $0.05$ (negligent) to $0.95$ (highly rigorous), executing $K=1,000$ Monte Carlo iterations per step.
+The first parameter to be studied is the pre-inspection audit rate $\alpha_\text{audit}$.
+It is the probability that a defect is identified and resolved prior to the HUD inspection. To quantify the impact of audit efficacy on compliance risk, $\alpha_\text{audit}$ was varied from $0.05$ (negligent) to $0.95$ (highly rigorous), executing $K=1,000$ Monte Carlo iterations per step.
 
 @fig-audit-ridges provides a visual summary of the resulting score distributions, bounded by a red failure threshold at 60.
 
@@ -632,7 +247,7 @@ plot_sensitivity_multi(
 * **Safety Baseline ($\alpha_\text{audit} \geq 0.90$)**: To confidently eliminate standard regulatory failure risk (score < 60), the internal audit process must successfully intercept at least 90% of all pre-existing defects.
 
 
-## 9.2. The Time Crunch: Notice of Inspection ($t_\text{start}$)
+# 4. The Time Crunch: Notice of Inspection ($t_\text{start}$)
 
 While a robust audit catch rate ($\alpha_\text{audit}$) is critical for passing an NSPIRE inspection, it assumes the maintenance team has the physical time to execute the repairs. HUD inspection notices can vary drastically, sometimes providing as little as 14 to 30 days of warning.
 
@@ -689,11 +304,11 @@ plot_sensitivity_multi(
 ```
 
 
-At first glance, the left side of @fig-time-crunch-labor appears counter-intuitive: as the preparation window drops below 20 days, the total expected cost plunges dramatically. This is not an efficiency gain; it is the mathematical manifestation of deferred maintenance (tasks that cannot be done before inspection day).
+At first glance, the left side of @fig-time-crunch-labor appears counter-intuitive: as the preparation window drops below 20 days, the total expected cost plunges dramatically. This is not an efficiency gain; it is the mathematical manifestation of deferred maintenance (backlog: tasks that cannot be done before inspection day).
 
-Reading the figure from right to left as the timeline compresses, between Day 30 and Day 22 the workforce heavily leverages their overtime allowance to keep pace with the workload. At Day 22, the system hits peak labor output—the team operates at absolute maximum capacity, driving overtime spend to its highest point. However, as the window shrinks below 20 days, the physical capacity of the workforce is exhausted. Items are forced into the backlog. Because abandoned items incur no labor or material costs, they create a false economy of savings.
+Reading the figure from right to left as the timeline compresses, between Day 30 and Day 22 the workforce heavily leverages their overtime allowance to keep pace with the workload. At Day 22, the system hits peak labor output—the team operates at absolute maximum capacity, driving overtime spend to its highest point. However, as the window shrinks below 20 days, the physical capacity of the workforce is exhausted. Items are forced into the backlog. Because abandoned items incur no labor or material costs, they create a false 'economy' of savings.
 
-@fig-time-crunch-backlog illustrates the severe regulatory consequences of this capacity exhaustion.
+@fig-time-crunch-backlog illustrates the regulatory consequences of this capacity exhaustion.
 
 ```{r}
 #| label: fig-time-crunch-backlog
@@ -742,9 +357,9 @@ plot_sensitivity_multi(
 
 * **Operational Collapse ($t_\text{start} \leq 15$)**: A standard 14-day HUD notice is mathematically unfeasible for a property in this condition with a baseline 5-technician crew. By Day 15, task backlog probability hits 100%, and failure risk exceeds 85%. The observed plunge in total costs is simply a trivial reflection of this abandoned work. When a short timeline is fixed, a static crew size guarantees failure. The immediate operational question then becomes: if the schedule cannot be extended, exactly how much must we expand the crew to avoid collapse?
 
-## 9.3. Staffing Requirements: The Capacity Curve
+# 5. Staffing Requirements: The Capacity Curve
 
-Having established in Section 9.2 that a compressed timeline leads to capacity exhaustion, the model can be inverted to estimate necessary staffing levels. By decoupling labor constraints from the audit catch rate, we can ask a specific operational question: Given a fixed preparation window, what is the minimum headcount required to achieve a 99.9% probability of clearing the known backlog? Using a binary search algorithm wrapped around the Monte Carlo engine ($K=1,000$ iterations per step), we mapped the required workforce capacity as the timeline collapses. A strict operational threshold ($P(\text{Backlog} > 0) \le 0.001$) was targeted to ensure the estimated staffing levels are mathematically robust.
+Having established in Section 4 that a compressed timeline leads to capacity exhaustion, the model can be inverted to estimate necessary staffing levels. By decoupling labor constraints from the audit catch rate, we can ask a specific operational question: Given a fixed preparation window, what is the minimum headcount required to achieve a 99.9% probability of clearing the known backlog? Using a binary search algorithm wrapped around the Monte Carlo engine ($K=1,000$ iterations per step), we mapped the required workforce capacity as the timeline collapses. A strict operational threshold ($P(\text{Backlog} > 0) \le 0.001$) was targeted to ensure the estimated staffing levels are mathematically robust.
 
 ```{r}
 #| label: fig-staffing-curve
@@ -785,10 +400,9 @@ As demonstrated in @fig-staffing-curve, the resulting capacity curve is highly n
 
 * **Quantifying Delay**: This analysis provides a mathematical framework to estimate the required headcount and the operational cost of a delayed response.
 
+# 6. Post-Prep Decay: The "Too Early" Penalty ($t_\text{end}$)
 
-## 9.4. Post-Prep Decay: The "Too Early" Penalty ($t_\text{end}$)
-
-In Section 9.2, we established that compressing the preparation timeline forces a property into a backlog cliff due to physical labor limits. A common operational response to this risk is to overcompensate by completing all pre-inspection repairs well in advance.
+In Section 4, we established that compressing the preparation timeline forces a property into a backlog cliff due to physical labor limits. A common operational response to this risk is to overcompensate by completing all pre-inspection repairs well in advance.
 
 However, residential properties are dynamic, entropic environments. The time gap between the completion of repairs ($t_\text{end}$) and the actual day of the HUD inspection exposes the property to a natural re-accumulation of defects.
 
@@ -840,19 +454,15 @@ plot_sensitivity_multi(
 
 ### Conclusions:
 
-**Decay Cliff**: Completing preparations too early introduces severe mathematical risk, manifesting as a "cliff" rather than a steady slope. The data demonstrates that a property remains relatively safe if it sits idle for up to three weeks. However, a property, having the used parameters here, that is highly likely to pass at $t_\text{end} = 0$ exhibits an exponential spike in failure risk if left idle beyond 25 days, reaching near-certain failure by day 35.
+**Decay Cliff**: Completing preparations too early introduces severe mathematical risk, manifesting as a "cliff" rather than a steady slope. The data demonstrates that a property remains relatively safe if it sits idle for up to three weeks. However, a property, characterized by the parameters used here, that is highly likely to pass at $t_\text{end} = 0$ exhibits an exponential spike in failure risk if left idle beyond 25 days, reaching near-certain failure by day 35.
 
-**"Goldilocks" Prep Window**: Combined with the capacity insights from Section 9.2, these results define a rigid operational window. A maintenance team must start late enough to avoid an excessive decay penalty ($t_\text{end} \le 25$ days) but early enough to avoid capacity exhaustion ($t_\text{start}$ constraint). Maximizing NSPIRE performance requires precise "just-in-time" repair scheduling.
+**"Goldilocks" Prep Window**: Combined with the capacity insights from Section 5, these results define a rigid operational window. A maintenance team must start late enough to avoid an excessive decay penalty ($t_\text{end} \le 25$ days) but early enough to avoid capacity exhaustion ($t_\text{start}$ constraint). Maximizing NSPIRE performance requires precise "just-in-time" repair scheduling.
 
-
-
-## 9.5. Spatial Heterogeneity and the "Lottery Effect"
-
+# 7. Spatial Heterogeneity and the "Lottery Effect" {#sec-tenant-mix}
 
 NSPIRE scores are heavily influenced by the spatial distribution of defects. HUD's sampling protocol selects a subset of units to represent the entire property. While mathematically sound for uniformly maintained properties, it introduces massive variance—the "Lottery Effect"—in properties with severe tenant heterogeneity.
 
 To quantify this, the proportion of clean tenants ($p$) was varied from 1.00 (homogeneous) down to 0.70. To isolate the sampling risk and ensure we were not artificially degrading the building's overall quality, a dynamic balancing equation was used. We enforced a strict "Conservation of Defects" by fixing the global expected severity multiplier at 1.0. For this analysis, the internal audit catch rate was set to 0.75 ($\alpha_\text{audit} = 0.75$), and the Monte Carlo engine executed 100,000 independent iterations per step to ensure high-resolution estimation of the extreme tails.
-
 
 Let $p$ be the proportion of clean units and $R$ be the severity ratio of a destructive unit (set to $20.0$). The expected defect multipliers for clean units ($\mu_c$) and destructive units ($\mu_d$) must satisfy:
 
@@ -905,7 +515,6 @@ plot_sensitivity_multi(
 ```
 
 Reading from right to left, as homogeneity breaks down, $\tau$ sharply increases, peaking near $p = 0.89$. This visualizes the core of the Lottery Effect: while the median score of the building remains relatively stable, the 5th percentile plummets. To understand the physical mechanisms driving this expansion—and its subsequent contraction at extreme heterogeneity—we must look at the physical defects themselves.
-
 
 @fig-tenant-physics visualizes the physical state of the building prior to HUD scoring.
 
@@ -980,13 +589,382 @@ Despite the highly heterogeneous building containing fewer total physical defect
 
 ### Conclusions:
 
-**The Lottery Effect is Real**: Under the NSPIRE scoring protocol, you cannot "average out" a destructive tenant. Because HUD's divisor is based on the sample size, stepping into just one or two heavily concentrated units will instantly drag an otherwise pristine property below a passing score.
+**The Lottery Effect is Real**: Under the NSPIRE scoring protocol, you cannot "average out" a destructive tenant. Because HUD's divisor is based on a sample size, stepping into just one or two heavily concentrated units will instantly drag an otherwise pristine property below a passing score.
 
-**Targeted Pre-Inspections**: A property with fewer total defects but high clustering is statistically more dangerous than a uniformly degraded property. If management is aware of specific high-impact tenants, those specific units must be audited and repaired at a 100% catch rate prior to the inspection, as they pose a disproportionate threat. A potential way to proactively identify these "dirty" units is to look for historically low rates of tenant service requests, which often mask severe deferred maintenance.
+**Targeted Pre-Inspections**: A property with fewer total defects but high clustering is statistically more dangerous than a uniformly degraded property. If management is aware of specific high-impact tenants, those specific units could be audited and repaired at a 100% catch rate prior to the inspection, as they pose a disproportionate threat. A potential way to proactively identify these "dirty" units is to look for historically low rates of tenant service requests, which often mask severe deferred maintenance. This is a hypothesis that might be worth testing with historical data on service requests.
 
+# 8. Methodology & Mathematical Framework
 
+## 8.1. The NSPIRE Scoring Mechanism
 
-# 10. References
+The inspection divides a property into distinct locations and evaluates defects based on severity. 
+
+### Definitions and Sets
+
+* **Severity:** $s \in \{\text{LT}, \text{S}, \text{STD}\}$ (Life-Threatening, Severe, Standard)
+* **Location:** $l \in \{\text{Unit}, \text{Inside}, \text{Outside}\}$
+* $N$: Total number of units in the property.
+* $n(N)$: The HUD-mandated sample size function, where $n$ is a discrete function of $N$.
+* $C_{s,l}$: True total count of defects existing in the property.
+* $c_{s,l}$: Observed count of defects recorded during the inspection.
+* $w_{s,l}$: Static point weight (penalty) assigned to a defect.
+
+### Deduction Function
+
+The total point deduction $D$ is a summation over all severities and locations. For Unit locations, the observed defects are normalized by the sample size $n(N)$, which effectively scales the deduction based on the inspection tier:
+
+$$D = \sum_{s} \sum_{l \in \{\text{Inside}, \text{Outside}\}} (c_{s,l} \cdot w_{s,l}) + \sum_{s} \left( \frac{c_{s,\text{Unit}}}{n(N)} \cdot w_{s,\text{Unit}} \right)$$
+
+### Raw Continuous Score
+
+The base score originates at 100 and is bounded at zero using the Heaviside step function $H(x)$:
+
+$$S_{raw} = (100 - D) \cdot H(100 - D)$$
+which is a negative "kill-switch" defined by
+$$H(x) = \begin{cases} 1 & \text{if } x \ge 0 \\ 0 & \text{otherwise} \end{cases}$$
+
+### Operational Compliance Function (Failsafe)
+
+A score $\ge 60$ mathematically passes, but the presence of **any** Life-Threatening (LT) defect forces an immediate 24-hour mitigation compliance failure. Let $n_{LT}$ represent the total observed LT defects:
+
+$$n_{LT} = \sum_{l} c_{\text{LT},l}$$.
+
+We model this regulatory mandate as a mathematical "kill switch" called the Heaviside function $H(x)$ and defined above. Namely, if even one LT defect is observed ($n_{LT} \ge 1$), the term $(0.5 - n_{LT})$ becomes negative. This drives the function to output a zero, instantly failing the property regardless of its raw score:
+$$S_{eff} = S_{raw} \cdot H(0.5 - n_{LT})$$
+
+## 8.2. Probabilistic Sampling and Realizations
+
+The inspection score is not a single, guaranteed number (a deterministic value). Instead, it is a **random variable**, representing the final outcome of many smaller random events—much like rolling a pair of dice. For example, whether the kitchen GFCI in Unit 1 happens to break today is a random event; whether the HUD inspector randomly chooses to inspect Unit 1 is another.
+
+Because of this randomness, running a single simulation (rolling the dice once) is not very informative. However, by running thousands of virtual inspections, called Monte Carlo simulations, we can build a complete score distribution. This allows us to move beyond guessing and mathematically estimate probabilities, such as the risk of failing the inspection (scoring below 60).
+
+### Stochastic Unit Sampling
+
+HUD inspection protocols dictate that units are randomly sampled. For a property with $N$ total units, the inspector chooses a subset $n(N)$ based on the tiered sampling schedule defined in Table 1.
+
+```{r}
+#| label: tbl-hud-sampling
+#| tbl-cap: "HUD NSPIRE Tiered Sampling Schedule"
+#| echo: false
+#| warning: false
+#| message: false
+
+library(DT)
+
+# 1. Base Data
+hud_sampling <- data.frame(
+  `Total Units (N)` = c("1–5", "6–7", "8", "9–10", "11–12", "13–14", "15–16", "17–18", 
+                        "19–21", "22–24", "25–27", "28–30", "31–35", "36–39", "40–45", 
+                        "46–51", "52–59", "60–67", "68–78", "79–92", "93–110", "111+"),
+  `Inspected Units (n)` = c("All units", "6", "7", "8", "9", "10", "11", "12", "13", 
+                            "14", "15", "16", "17", "18", "19", "20", "21", "22", "23", 
+                            "24", "25", "32"),
+  check.names = FALSE
+)
+
+# 2. Define mathematical boundaries
+min_n <- c(1, 6, 8, 9, 11, 13, 15, 17, 19, 22, 25, 28, 31, 36, 40, 46, 52, 60, 68, 79, 93, 111)
+max_n <- c(5, 7, 8, 10, 12, 14, 16, 18, 21, 24, 27, 30, 35, 39, 45, 51, 59, 67, 78, 92, 110, 500)
+
+# 3. Create the hidden search index string (e.g., "25 26 27")
+hud_sampling$SearchTerms <- mapply(function(start, end) {
+  paste(seq(start, end), collapse = " ")
+}, min_n, max_n)
+
+# 4. Render Interactive Table with custom Regex search
+datatable(
+  hud_sampling,
+  options = list(
+    pageLength = 8,
+    dom = 'ftp', 
+    autoWidth = TRUE,
+    columnDefs = list(
+      list(className = 'dt-center', targets = 0:1),
+      list(visible = FALSE, targets = 2) # Hide the search string
+    ),
+    # Inject JavaScript to wrap the user's input in word boundaries (\b)
+    initComplete = JS(
+      "function(settings, json) {",
+      "  var dt = this.api();",
+      "  $('.dataTables_filter input').unbind().on('keyup', function(e) {",
+      "    var val = this.value.trim();",
+      "    if(val) {",
+      "      dt.search('\\\\b' + val + '\\\\b', true, false).draw();",
+      "    } else {",
+      "      dt.search('').draw();",
+      "    }",
+      "  });",
+      "}"
+    )
+  ),
+  rownames = FALSE,
+  class = 'cell-border stripe hover'
+)
+```
+
+In massive high-rise properties ($N > 100$), the inspection score tends to be highly stable because extreme outcomes naturally "average out" (Law of Large Numbers). However, for small to mid-sized properties ($N \leq 50$), this random sampling creates much larger relative variations. Because the inspector is pulling a random handful of units, the defects they happen to stumble upon ($c_{s,\text{Unit}}$) can be drastically better or worse than the actual overall condition of the building ($C_{s,\text{Unit}}$). This "luck of the draw" drives a wider spread of possible final scores in small to mid-sized properties.
+
+### Realization of Deductions
+
+Let $I_{u}$ be an indicator variable for unit $u$, that is, $I_u = 1$ if unit $u$ is selected for inspection, and $0$ otherwise. The observed defect count $c_{s,\text{Unit}}$ for a specific simulation realization $\omega$ is defined by the subset of selected units:
+$$c_{s,\text{Unit}}(\omega) = \sum_{u=1}^{N} I_u(\omega) \cdot \mathbb{1}(\text{unit } u \text{ has defect } s)$$
+where $\mathbb{1}(\text{statement})$ is 1 if $\text{statement}$ is true and 0 otherwise.The model calculates the realization $D(\omega)$ for each simulation $k$ in the Monte Carlo ensemble. The set of all realizations records the variance, inherent in the sampling process, which is the primary driver of the "lottery effect" in mid-sized properties.
+
+### Task Execution Times and Mixture Distributions
+
+Just as the inspector's choice of units is random, the time required to complete a maintenance task is never a fixed number.To model this physical reality, we treat execution time $t_i$ as a random variable drawn from a bounded Beta-PERT (Program Evaluation and Review Technique) distribution. PERT is widely used in project management because it relies on three intuitive estimates: an optimistic minimum ($a$), a most likely mode ($m$), and a pessimistic maximum ($b$).However, tasks often exist in distinctly different physical states. Consider a sink drain: it might simply require a quick manual adjustment by a technician (State 1), or it might require a licensed plumber to replace the downstream PVC P-trap (State 2). To account for this, the execution time $t_i$ is drawn from a mixture distribution, weighted by the physical probability of each state ($p_{i,k}$):
+$$f(t_i) = \sum_{k} p_{i,k} \cdot \text{PERT}(t; a_k, m_k, b_k)$$
+Using a single "average time" for such a task would be a fallacy, as it would plan for an event that never actually happens. As illustrated in @fig-multimodal-pert, the mixture distribution correctly captures the bifurcated reality of the repair.
+
+```{r}
+#| label: fig-multimodal-pert
+#| fig-cap: "Example of a Bimodal Mixture Distribution. The mathematical 'average' time falls in a dead zone, highlighting why stochastic modeling is required for accurate labor planning."
+#| fig-width: 8
+#| fig-height: 4
+#| echo: false
+#| message: false
+#| warning: false
+
+library(ggplot2)
+library(dplyr)
+
+# Custom PERT density function to avoid extra package dependencies
+dpert <- function(x, a, m, b) {
+  alpha <- 1 + 4 * (m - a) / (b - a)
+  beta <- 1 + 4 * (b - m) / (b - a)
+  stats::dbeta((x - a) / (b - a), alpha, beta) / (b - a)
+}
+
+# Define the two states for the plumbing example
+x <- seq(0, 120, length.out = 500)
+state1 <- dpert(x, a = 5, m = 15, b = 30) * 0.70  # Tech adjustment (70% probability)
+state2 <- dpert(x, a = 45, m = 70, b = 110) * 0.30 # Plumber PVC fix (30% probability)
+mixture <- state1 + state2
+
+df <- data.frame(Time = x, Density = mixture)
+mean_time <- sum(df$Time * df$Density) / sum(df$Density)
+
+ggplot(df, aes(x = Time, y = Density)) +
+  geom_area(fill = "#4e79a7", alpha = 0.6) +
+  geom_line(color = "#2c4663", linewidth = 1) +
+  geom_vline(xintercept = mean_time, color = "#e15759", linetype = "dashed", linewidth = 1) +
+  annotate("text", x = 15, y = max(df$Density) * 0.6, label = "State 1:\nTech Adjustment", size = 4) +
+  annotate("text", x = 75, y = max(df$Density) * 0.4, label = "State 2:\nPlumber PVC Fix", size = 4) +
+  annotate("text", x = mean_time + 2, y = max(df$Density) * 0.9, label = "Mean Time\n(Danger Zone)", color = "#e15759", hjust = 0, size = 4) +
+  theme_minimal(base_size = 14) +
+  labs(
+    title = "Mixture Distribution of Execution Time",
+    x = "Execution Time (Minutes)",
+    y = "Probability Density"
+  ) +
+  theme(panel.grid.minor = element_blank())
+```
+
+By mapping these mixture distributions across the entire property, we build a comprehensive dictionary of constraints. The complete operational matrix—detailing baseline defect rates, multi-state PERT parameters, material costs, and prerequisite dependencies—is defined in @tbl-tasks-config.
+
+This master configuration encodes tasks realities into the simulation engine. For example, it explicitly maps the physical handoffs between internal technicians adjusting standard sink drains and licensed plumbers replacing downstream PVC P-traps via vendor flags and scheduling lags.
+
+When using the interactive table below, expanding the arrow at the left of any task reveals the exact time, cost, and probability parameters driving its Monte Carlo realizations.
+
+```{r}
+#| label: tbl-tasks-config
+#| tbl-cap: "NSPIRE Task Modalities and Execution Constraints. Task categories map to core operational domains: FS (Fire Safety), EL (Electrical), PL (Plumbing), VA (Ventilation & Appliances), DW (Doors, Windows & Millwork), and SU (Surfaces). Clicking on the row arrow will display PERT, cost and decay parameters."
+#| echo: false
+#| warning: false
+#| message: false
+
+# Load the required libraries
+library(DT)
+library(readr)
+
+# Read the CSV
+tasks_df <- read_csv("../inst/extdata/tasks_config.csv")
+
+# Generate and print the interactive table
+datatable(
+  tasks_df,
+  extensions = c('FixedColumns', 'Responsive'),
+  options = list(
+    pageLength = 10,
+    scrollX = TRUE,
+    fixedColumns = list(leftColumns = 5), 
+    autoWidth = TRUE,
+    columnDefs = list(
+      list(className = 'dt-center', targets = "_all")
+    )
+  ),
+  class = 'cell-border stripe hover'
+)
+```
+
+## 8.3 Post-Audit Asset Decay
+
+A final, critical parameter embedded within the master configuration (@tbl-tasks-config) is the baseline decay rate (p_decay). In residential properties, a resolved defect does not stay resolved indefinitely. Once a repair is completed and audited at time $t_{end}$, the asset immediately re-enters a state of stochastic wear-and-tear.
+
+We model this defect re-emergence as a Bernoulli (i.e. binary) process over the waiting period $\delta_{decay}$ (the time gap between the completion of the repair and the arrival of the HUD inspector). Given a baseline daily probability of failure $\lambda_{i}$ for task $i$, the probability $P_{redefect}$ that a newly resolved task breaks again before the inspection is:
+$$P_{redefect} = 1 - (1 - \lambda_{i,u}^*)^{\delta_{decay}}$$
+Crucially, this decay is not uniform across the property. The effective daily probability of failure $\lambda_{i,u}^*$ is coupled with the unit's latent state $\phi_u$. This mathematical multiplier actively accelerates the re-emergence of defects in high-impact ("dirty") units:
+$$\lambda_{i,u}^* = \lambda_{i} \cdot \phi_u$$
+This temporal decay creates a severe operational trade-off. Finishing preparations too early maximizes the decay window ($\delta_{decay}$), inflating the probability that critical life-safety items (like a smoke detector or GFCI) will randomly fail before the inspector arrives. Conversely, starting preparations too late constricts the repair window, ensuring a labor backlog.
+
+Beyond stochastic time estimates and decay rates, the master configuration table (@tbl-tasks-config) contains one more vital operational constraint: the prerequisites column. Real-world maintenance cannot be executed in a random order. To enforce the physical sequence of repairs, the simulation translates these prerequisites into a Directed Acyclic Graph (DAG), enforcing the rigid "order of operations" required to prep a unit.
+
+## 8.4 Resource Mapping and Graph Topology (DAG){#sec-dag}
+
+Repairs cannot always happen simultaneously or in random order. For example, you cannot paint a wall before patching the drywall, and you cannot patch the drywall before fixing the plumbing leak behind it.
+
+To model this operational reality, we organize maintenance tasks into a Directed Acyclic Graph (DAG). In simpler terms, a DAG is a strict, one-way flowchart that maps out the required "order of operations." Each task (mathematically called a vertex, $V_i$) requires an expected execution time $t_i$ and a material cost $m_i$.
+
+```{Mermaid}
+%%| fig-cap: "A simple Directed Acyclic Graph (DAG) illustrating mandatory task sequences."
+flowchart LR
+    A[Fix Plumbing Leak] --> B[Patch Drywall]
+    B --> C[Wait for Compound to Dry]
+    C --> D[Paint Wall]
+    
+    style A fill:#f9f9f9,stroke:#333,stroke-width:2px
+    style B fill:#f9f9f9,stroke:#333,stroke-width:2px
+    style C fill:#ffe6cc,stroke:#d79b00,stroke-width:2px,stroke-dasharray: 5 5
+    style D fill:#f9f9f9,stroke:#333,stroke-width:2px
+```
+
+When applied to the entire NSPIRE catalog, the complexity of maintenance becomes more apparent. In @fig-dag-network below, the algorithm scales the size of each node by its mathematical out-degree: the number of downstream tasks that physically depend on it.
+
+Large nodes represent bottlenecks. For example, EL-02 (the Breaker Box) acts as a prerequisite hub. If this root node is not cleared first, it initiates a cascading scheduling freeze, preventing technicians from executing subsequent tasks like GFCI replacements, exhaust fan repairs, or lighting installations.
+
+```{r}
+#| label: fig-dag-network
+#| fig-cap: "The complete maintenance DAG. Node size indicates bottleneck severity. Hover over any node to view the full task description. Use the top control in the right corner to reset the view. Categories of tasks: FS (Fire Safety), EL (Electrical), PL (Plumbing), VA (Ventilation & Appliances), DW (Doors, Windows & Millwork), and SU (Surfaces)"
+#| echo: false
+#| warning: false
+#| message: false
+
+library(igraph)
+library(visNetwork)
+
+# 1. Load the DAG and Configuration
+dag_csv <- "../inst/extdata/tasks_config.csv"
+dag_obj <- create_inspection_dag(dag_csv)
+g <- dag_obj@graph
+tasks_df <- dag_obj@tasks_config
+
+# 2. Build Interactive Nodes Dataframe
+nodes <- data.frame(id = V(g)$name, label = V(g)$name)
+
+# Match node IDs to config to extract categories and descriptions
+idx <- match(nodes$id, tasks_df$task_id)
+nodes$group <- tasks_df$category[idx]
+
+# Create the tooltip (HTML formatted)
+nodes$title <- paste0("<p><b>", tasks_df$task_id[idx], "</b><br>", 
+                      tasks_df$description[idx], "</p>")
+
+# Calculate out-degree for node sizing
+out_deg <- degree(g, mode = "out")
+nodes$value <- out_deg + 1 
+
+# 3. Build Interactive Edges Dataframe
+edges <- igraph::as_data_frame(g, what = "edges")
+
+# 4. Render Interactive Graph
+visNetwork(nodes, edges, width = "100%", height = "600px") |>
+  visIgraphLayout(layout = "layout_with_fr", randomSeed = 42) |>
+  visEdges(arrows = "to", color = list(color = "#a9a9a9"), smooth = FALSE) |>
+  visNodes(
+    font = list(size = 20, face = "sans", color = "black"),
+    borderWidth = 1
+  ) |>
+  visOptions(
+    highlightNearest = list(enabled = TRUE, degree = 1, hover = FALSE),
+    nodesIdSelection = TRUE # Dropdown menu to search for specific nodes
+  ) |>
+  # Adds the navigation and reset controls
+  visInteraction(navigationButtons = TRUE)
+```
+
+### Edge Constraints (Operational Laws)
+
+The arrows connecting these tasks are not just visual lines; they act as rigid operational laws within the simulation engine.
+
+* **Sequential Precedence**: A directed edge $V_A \to V_B$ requires the start time of $B$ to be $\ge$ the end time of $A$.
+  * Example: A technician cannot paint a wall before the drywall compound has fully dried.
+* **Temporal Blocking**: Certain vertices impose a local resource freeze, locking a spatial node for a time interval $\Delta t$.
+  * Example: If an external vendor reglazes a tub that physical zone is locked out for a mandatory cure time. The scheduling engine forces internal technicians to re-route to other tasks or units.
+* **Mutually Exclusive Pruning**: If a higher-order vertex $V_{replace}$ is activated, redundant child vertices $V_{repair}$ are mathematically pruned ($t_{repair} \to 0$).
+  * Example: If an upper kitchen cabinet is critically broken and flagged for full replacement, the system instantly cancels minor, redundant adjustments to its hinges or doors, preventing the budget from absorbing phantom labor hours.
+
+## 8.5 Execution Capacity and Quality Control
+
+Even with a perfectly sequenced DAG, execution is bound by strict physical limits: the time available to work, the reliance on external vendors, and the inevitability of human error.
+
+### Repair Capacity and Vendor Bottlenecks
+
+The model assumes a maintenance repair window defined by $t_{start}$ (commencement of internal repairs) and $t_{end}$ (completion of repairs and audit). Given a standard baseline labor capacity $R_{base}$ (hours/unit/day), the total labor capacity $\text{Cap}$ available for the maintenance cycle is linearly proportional to the duration of this window:
+$$\text{Cap} = R_{base} \cdot (t_{start} - t_{end})$$
+Tasks requiring labor hours $T_{total} > \text{Cap}$ result in a scheduling backlog, forcing the system to abandon lower-severity items to prioritize high-penalty (LT/S) defects.
+
+This capacity is further choked by tasks requiring external licensing. For example, while a technician handles a sink drain, repairing the downstream PVC P-trap requires a licensed plumber. When a node evaluates to this severe state, internal labor drops to zero ($t_{internal} \to 0$), but a schedule lag is injected based on a Uniform distribution: $L \sim \text{Uniform}(l_{min}, l_{max})$ days. Furthermore, a mandatory spatial lockout is triggered (e.g., a 24-hour cure time after glazing), forcing the DAG to re-route technicians and accelerating the exhaustion of the remaining timeline.
+
+### Human Error and Audit Efficacy
+
+Execution of a task does not guarantee absolute resolution. A task has a baseline physical probability ($p_{err}$) of being missed or improperly repaired. We quantify quality control using a formal internal audit efficacy parameter, $\alpha_\text{audit} \in [0, 1]$, representing the probability that the pre-inspection internal team detects and successfully mitigates a surviving defect.
+
+**Serial Execution (Single Technician)**: The probability that a defect survives the initial repair attempt and remains undetected by the audit phase is:
+$$P(\text{Survive}) = (1 - \alpha_\text{audit}) \cdot p_{err}$$
+**Parallel Execution (Dual Technicians)**: Applying the "Four Eyes" principle, independent cross-checking drastically reduces error. The joint probability of both technicians missing the defect becomes:
+$$P(\text{Survive}) = (1 - \alpha_\text{audit}) \cdot p_{err}^2$$
+
+## 8.6 Tenant Heterogeneity and Predictive Risk
+
+Asset deterioration is not uniform across a property. Baseline probabilities assume a standard deterioration rate, but operational reality dictates that damage clusters around specific tenant behaviors.
+
+### The Bimodal Risk of Tenant Behavior
+
+We model unit "cleanliness" as a bimodal state $\phi_u$ for each unit $u$, representing the inherent maintenance burden generated by the tenant. The tenant impact multiplier $\phi_u$ is drawn from a mixture distribution:
+$$\phi_u \sim \begin{cases} \phi_{clean}, & \text{with probability } (1 - \pi) \\ \phi_{dirty}, & \text{with probability } \pi \end{cases}$$
+Where $\pi$ is the estimated proportion of high-impact units in the property.
+
+Note that the default simulation parameters assume tenant homogeneity. The effect of a two-valued $\phi_u$ is examined only in Section @sec-tenant-mix.
+
+### The Danger of Silence (Latent Covariates)
+
+A lack of historical tenant reporting might mask severe deferred maintenance. To combat this, we could use historical service request volume $W_u$ as a proxy to infer the probability that a unit belongs to the high-impact "dirty" latent state ($\phi_{dirty}$).
+
+We could define the unit-specific probability $\pi_u$ as a logistic function of service requests $W_u$:
+$$\pi_u = P(\phi_u = \phi_{dirty} \vert{} W_u) = \text{logit}^{-1}(\alpha - \beta W_u)$$
+Where $\alpha$ and $\beta$ are calibrated tuning parameters. For units with extremely low reporting ($W_u \to 0$), the prior probability of being in the "dirty" state dramatically increases, signaling a high likelihood of latent defects.
+
+This feature is **not used in this document**. Exploring it would be an interesting exercise but it would certainly require access to actual tenant data.
+
+## 8.7 Risk Analysis
+
+Moving beyond deterministic score projections, this model quantifies operational risk by treating property performance as a stochastic process. By leveraging Monte Carlo simulation, we assess not only the expected outcome but the probability of regulatory non-compliance.
+
+### Quantification of Failure Risk
+
+We define the failure event as $S_{eff} < 60$. Due to the non-linear interaction of random unit sampling, defect emergence probabilities, and repair quality, the effective inspection score $S_{eff}$ is a random variable. We estimate the probability of failure ($P_{fail}$) by simulating $K = 1,000$ independent inspection realizations:
+$$P_{fail} = \frac{1}{K} \sum_{i=1}^{K} I(S_{eff,i} < 60)$$
+where $I(\cdot)$ is again the indicator function. This allows us to map the property's risk profile against the HUD enforcement threshold, providing a granular view of the likelihood of catastrophic failure that a mean-based score effectively masks.
+
+### Quantifying Volatility
+
+Standard deviation ($\sigma$) and the Coefficient of Variation ($CV = \sigma/\mu$) provide a global measure of dispersion. However, in NSPIRE compliance, the right tail (scores $> 100$) is truncated, and the distribution is often skewed. The primary risk resides in the left tail—the possibility of a "bad day" where HUD sampling captures a concentrated cluster of high-severity defects. To quantify this downside volatility, we define the Tail Drop Metric ($\tau$):
+$$\tau = \frac{\text{med} - P_{05}}{\text{med}}$${#eq-tau}
+
+Where:
+
+* $\text{med}$ is the median score
+* $P_{05}$ is the 5th percentile of the simulated scores.
+
+$\tau$ represents the percentage degradation from expected performance to the worst-case scenario.
+
+A property may exhibit a high median score while maintaining a high $\tau$, identifying it as a "lottery" asset—stable on average, but highly susceptible to non-linear drops in score due to the interaction of unit sampling variance and tenant-driven decay.
+
+The Tail Drop Metric $\tau$ is a systemic output of our model, functionally defined by the interaction of our control and stochastic parameters:
+$$\tau = f(n(N), \alpha_\text{audit}, \pi, \phi_{dirty})$$
+This sensitivity function captures how variance in the HUD sampling tier $n(N)$, human error in pre-inspection audit ($\alpha_\text{audit}$), and the underlying distribution of tenant impact ($\pi, \phi_{dirty}$) propagate into downside performance risk. 
+
+# 9. References
 
 ::: {#refs}
 :::
@@ -1050,7 +1028,7 @@ kable(scoring_df, col.names = c("Rubric Name", "Severity", "Deduction"))
 
 Global simulation constraints—such as time limits, labor capacities, and transit friction—are controlled via a master YAML configuration (scenario1.yml). This design allows for rapid sensitivity testing across different macro-operational environments without altering the underlying R source code.
 
-The baseline parameters used as the anchor for the studies in Section 9 are detailed below:
+The baseline parameters used as the anchor for the studies in Sections 2 to 7 are detailed below:
 
 ````markdown
 ```yaml

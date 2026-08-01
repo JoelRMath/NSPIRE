@@ -815,7 +815,7 @@ Repairs cannot always happen simultaneously or in random order. For example, you
 
 To model this operational reality, we organize maintenance tasks into a Directed Acyclic Graph (DAG). In simpler terms, a DAG is a strict, one-way flowchart that maps out the required "order of operations." Each task (mathematically called a vertex, $V_i$) requires an expected execution time $t_i$ and a material cost $m_i$.
 
-```{Mermaid}
+```{mermaid}
 %%| fig-cap: "A simple Directed Acyclic Graph (DAG) illustrating mandatory task sequences."
 flowchart LR
     A[Fix Plumbing Leak] --> B[Patch Drywall]

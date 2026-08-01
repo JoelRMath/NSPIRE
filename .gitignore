@@ -4,4 +4,4 @@
 .Ruserdata
 inst/doc
 results/sensitivity//raw*.rds
-
+vignettes/*.zip

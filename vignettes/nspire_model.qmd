@@ -12,6 +12,14 @@ format:
     embed-resources: true
     highlight-style: tango
     link-external-newwindow: true
+    include-after-body: 
+      text: |
+        <script>
+          // Force all external URLs to open in a new tab for local file viewing
+          document.querySelectorAll('a[href^="http"]').forEach(function(link) {
+            link.setAttribute("target", "_blank");
+          });
+        </script>
 bibliography: references.bib
 nocite: |
   @*

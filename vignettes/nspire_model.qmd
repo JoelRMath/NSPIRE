@@ -46,7 +46,7 @@ library(patchwork)
 This report bridges property maintenance with Operations Research [[link]](https://www.informs.org/Explore/Operations-Research-Analytics) in the context of preparation work prior to a building inspection. Because it contains both operational directives and mathematical work, it is designed to be read modularly based on your interest:
 
 **For a rapid strategic overview**: Read Section 1. This provides an executive summary and key operational findings.<br>
-**For a detailed analysis of the simulation results**: Read Sections 1 and 2. This explores the specific failure thresholds, staffing capacity curves, and temporal risks.<br>
+**For a detailed analysis of the simulation results**: Read Section 2 to examine parameter sensitivities, operational thresholds, and quantitative risk assessments.<br>
 **For the underlying methodology**: Jump to Section 3 for the mathematical framework, stochastic modeling mechanics, and DAG workflow mapping.<br>
 **For reproducibility and software architecture**: Refer to the Appendices to review the simulation configuration files and the complete R codebase.
 
@@ -54,20 +54,20 @@ This report bridges property maintenance with Operations Research [[link]](https
 
 Preparing a property for a HUD NSPIRE inspection is a complex operational challenge governed by rigid constraints: labor limits, task dependencies, and tenant behavior.
 
-This document presents a data-driven approach to optimizing this pre-inspection workflow. By leveraging Monte Carlo simulation, we execute thousands of "virtual inspections", where each simulation is a set of realization of random defects followed by their repairs and random drawing of units selected for inspection. This enables estimation of inspection score distributions. This stochastic engine stress-tests a property's risk profile, bridging ground-level maintenance realities with probabilistic modeling. To enforce the physical laws of maintenance, the workflow is mapped as a Directed Acyclic Graph (DAG) to guarantee proper task sequencing and compliance with temporal lockouts (@sec-dag).
+This document presents a data-driven approach to optimizing this pre-inspection workflow. By using Monte Carlo simulation, we execute thousands of "virtual inspections," each modeling the random emergence of defects, the subsequent maintenance response, and HUD’s random unit sampling. This probabilistic engine stress-tests a property's risk profile by generating a distribution of potential scores. To enforce the physical laws of maintenance, the workflow is mapped as a Directed Acyclic Graph (DAG), guaranteeing proper task sequencing and compliance with mandatory temporal lockouts (@sec-dag).
 
-Because the model is driven by modular configuration files—defining specific maintenance tasks, building floor plans, labor scenarios, and scoring schemes—it is highly adaptable and can easily generate tailored baseline estimates for any given property. However, its strategic value goes beyond forecasting a score distribution. Its greatest value is prescriptive: it isolates the mathematical architecture of an inspection to identify critical operational levers and their failure thresholds.
+Relying on modular configuration files—which define specific maintenance tasks, floor plans, labor scenarios, and scoring schemes—the model is adaptable and can generate estimates for any property. However, its true value is prescriptive: it isolates the mathematical architecture of an inspection to identify critical operational levers and their exact failure thresholds.
 
-Ultimately, this document serves as a proof-of-concept for the utility of [Operations Research](https://www.informs.org/Explore/Operations-Research-Analytics) in property management. By mapping the complex mathematical interactions between time, labor, and probability, it demonstrates how raw data is translated into operational directives—identifying staffing requirements, exposing the physical limits of overtime, and defining the timelines needed to guarantee regulatory compliance.
+Ultimately, this document serves as a proof-of-concept for the utility of [Operations Research](https://www.informs.org/Explore/Operations-Research-Analytics) in property management. By mapping the complex interactions between time, labor, and probability, it translates raw data into concrete operational directives—identifying staffing requirements, exposing the physical limits of overtime, and defining the precise timelines needed to guarantee regulatory compliance.
 
-Specifically, the simulation reveals the following key findings. Importantly, these insights were not explicitly programmed into the model; rather, they emerged as consequences of complex component interactions:
+Specifically, the simulation reveals the following findings. These insights were not explicitly programmed; rather, they emerged as mathematical consequences of model component interactions:
 
-*   **The Hidden Labor Tax:** Idealized time estimates fail in the field. Incorporating realistic human behavior—such as 5-minute intra-unit tool transitions and 15-minute inter-unit transit times—imposes a severe 34% labor tax on baseline estimates, a discrepancy we define as the Operational Reality Gap (see @fig-transit-friction).
-*   **The Quality Assurance Floor:** Internal pre-inspections must be highly rigorous. The model demonstrates that teams must intercept at least 90% of existing defects to virtually eliminate failure risk. Conversely, an audit catch rate below 25% is mathematically futile, offering zero protection against the scoring floor (@fig-failure-audit).
-*   **The Overtime Illusion:** Capital cannot infinitely solve scheduling crunches. Compressing preparation timelines below 15 days forces the workforce into a "backlog cliff." At this threshold, authorizing maximum capital expenditure on overtime cannot prevent regulatory failure (@fig-time-crunch-labor and @fig-time-crunch-backlog).
-*   **Non-Linear Staffing Surges:** Shortened inspection notices cannot be mitigated simply by authorizing more hours. Because of strict task dependencies and spatial lockouts, compressed timelines demand an exponential surge in active headcount to execute parallel workflows. For example, halving a preparation schedule from 14 days to 7 days does not simply double the required workforce; it multiplies it by a factor of six (@fig-staffing-curve).
-*   **The Post-Prep Decay Penalty:** Completing repairs too early introduces significant physical decay risk. Crucially, this decay does not accumulate gradually; it behaves as a strict mathematical threshold. The model reveals an approximate 20-day "grace period" where median scores remain stable and the probability of failure stays near zero. However, immediately following this window, the property faces a sharp acceleration in defect re-emergence (@fig-decay-score). Score confidence erodes significantly—with the 5th percentile worst-case score dropping steeply—and failure probabilities rise exponentially. Success therefore requires precise, "just-in-time" scheduling: preparations should start early enough to avoid capacity exhaustion, but finish late enough to stay safely within this pre-inspection decay threshold (@fig-decay-risk).
-*   **The Lottery Effect:** HUD’s random sampling protocol severely penalizes spatial variance. A handful of highly destructive tenants in an otherwise pristine building triples the probability of a catastrophic inspection failure (@fig-tenant-risk). To neutralize this threat, management could aggressively target high-risk units during the internal audit. We hypothesize that "silent" units—those with unusually low historical service request rates—serve as a strong predictive proxy for these hidden defects. Validating this operational hypothesis represents a high-value opportunity for future analysis, requiring integration with a property management database to analyze historical work-order data.
+*   **The Hidden Labor Tax:** Idealized time estimates fail in practice. Incorporating 5-minute intra-unit tool transitions and 15-minute inter-unit transit times introduces a 34% expansion in required labor hours, referred to here as the Operational Reality Gap (@fig-transit-friction).
+*   **The Quality Assurance Floor:** Internal pre-inspections require efficacy. The model demonstrates that teams must intercept at least 90% of existing defects to eliminate regulatory failure risk. Conversely, an audit catch rate below 25% offers zero protection against the scoring floor (@fig-failure-audit).
+*   **The Overtime Illusion:** Capital cannot bypass physical scheduling limits. Compressing preparation timelines below 15 days forces the workforce into a capacity deficit ("backlog cliff"). At this threshold, authorizing maximum overtime expenditure cannot prevent regulatory failure (@fig-time-crunch-labor and @fig-time-crunch-backlog).
+*   **Non-Linear Staffing Surges:** Due to task dependencies and spatial lockouts, compressed timelines demand an exponential increase in headcount to execute parallel workflows. Halving a preparation schedule from 14 days to 7 days does not double the required workforce; it multiplies it by a factor of six (@fig-staffing-curve).
+*   **The Post-Prep Decay Penalty:** Completing repairs too early introduces physical decay risk that behaves as a threshold rather than a gradual slope. The model identifies an approximate 20-day window where median scores remain stable and failure probabilities stay near zero. Following this window, defect re-emergence accelerates, dropping the 5th percentile worst-case score steeply. Compliance requires "just-in-time" scheduling: preparations must start early enough to avoid capacity exhaustion, but finish late enough to remain within this decay threshold (@fig-decay-score, @fig-decay-risk).
+*   **The Lottery Effect:** HUD’s random sampling protocol mathematically penalizes spatial variance. A localized cluster of destructive tenants in an otherwise standard building triples the probability of catastrophic inspection failure (@fig-tenant-risk). Mitigating this requires targeting high-risk units during the internal audit. We hypothesize that "silent" units—those with unusually low historical service request rates—could serve as a predictive proxy for hidden defects. Validating this hypothesis represents an opportunity for future analysis using historical work-order data.
 
 Section 2 explores the results obtained with simulations, detailing the specific thresholds where standard preparation strategies fail. For readers interested in the structural logic of the model, the mathematical architecture and simulation mechanics—including the Directed Acyclic Graph (DAG) workflow mapping—are detailed in Section 3, prior to the appendices, which provide modeling parameters and simulator code.
 
@@ -75,14 +75,14 @@ Section 2 explores the results obtained with simulations, detailing the specific
 
 ## 2.1 Operational Reality: The Transit Friction Tax {#sec-friction}
 
-Theoretical models that treat technicians as perfect, frictionless robots are likely to provide unrealistic time estimates. Standard algorithmic approaches would calculate only pure "wrench time"—the isolated minutes required to physically execute a repair. This fundamentally ignores the physical and human constraints of moving labor through a segmented residential environment.
+Models that treat maintenance technicians as frictionless agents produce inaccurate time estimates. Standard approaches typically calculate only pure "wrench time"—the minutes required to execute a repair. This ignores the physical and human constraints of routing labor through a segmented residential environment.
 
-To accurately model ground-level execution, the simulation injects "transit friction" into the schedule:
+To model operational execution, the simulation incorporates "transit friction" into the schedule:
 
-* **Intra-Unit Friction (~5 minutes)**: The time required to clean up, swap tools, and transition between tasks within the same apartment. Even minor operational handoffs—such as a technician finishing a standard sink drain adjustment before a plumber takes over the downstream PVC—introduce rigid micro-delays.
-* **Inter-Unit Friction (~15 minutes)**: The time required to pack up a tool bag, navigate the property, unlock a new door, and assess the next cluster of defects. Crucially, this also accounts for basic human necessities: taking a water break, using the restroom, or pausing to answer a colleague's question.
+* **Intra-Unit Friction (~5 minutes)**: The time required to clean up, swap tools, and transition between tasks within the same apartment. Minor operational handoffs—such as a technician finishing a standard sink drain adjustment before a plumber takes over the downstream PVC—introduce rigid micro-delays.
+* **Inter-Unit Friction (~15 minutes)**: The time required to pack tools, navigate the property, unlock a new door, and assess the next cluster of defects. This also accounts for standard human necessities and brief pauses.
 
-To quantify the macroeconomic impact of these human constraints, the simulation executed 10,000 paired scenarios (comparing pure wrench time against friction-adjusted time) for a standard 50-unit property. Results are summarized with @fig-transit-friction.
+To quantify the operational impact of these constraints, the simulation executed 10,000 paired scenarios—comparing pure wrench time against friction-adjusted time—for a standard 50-unit property. Results are summarized in @fig-transit-friction.
 
 ```{r}
 #| label: fig-transit-friction
@@ -120,18 +120,15 @@ ggplot(plot_data, aes(x = Total_Hours, fill = Scenario, color = Scenario)) +
 
 ### Conclusions
 
-**The 34% Labor Tax**: Transit friction is not a symptom of an inefficient workforce; it is a structural penalty dictated by physics and human reality. The compounding effect of minor 5-minute and 15-minute delays generates an unavoidable 34.2% expansion in total required labor hours.
+**The 34% Labor Tax**: Transit friction is not a measure of workforce inefficiency, but a structural constraint. The compounding effect of minor 5- and 15-minute delays generates a 34.2% expansion in total required labor hours.
 
-**Budgetary Blind Spot**: If management calculates staffing requirements, prep timelines, or overtime budgets based solely on idealized task lists, the property is instantly under-resourced by a third. Optimizing execution requires scheduling algorithms that prioritize spatial clustering, keeping technicians in a single unit as long as possible to suppress this hidden tax.
+**Budgetary Blind Spot**: Calculating staffing requirements, prep timelines, or overtime budgets based solely on idealized task lists underestimates required resources by one-third. Optimizing execution requires scheduling workflows that prioritize spatial clustering—keeping technicians in a single unit as long as possible to minimize this transit overhead.
 
 ## 2.2 Audit Catch Rate ($\alpha_\text{audit}$)
 
-Sensitivity analysis studies how variations in control parameters drive system outcomes, such as expected score, labor costs, and downside risk ($P_{fail}$ and $\tau$). By studying these variables across parameter ranges, one can identify parameter critical ranges, non-linear thresholds and propose optimal resource allocations...
+To identify critical thresholds and optimal resource allocations, we first evaluate the pre-inspection audit rate ($\alpha_\text{audit}$). This parameter defines the probability that a defect is identified and resolved prior to the HUD inspection.
 
-The first parameter to be studied is the pre-inspection audit rate $\alpha_\text{audit}$.
-It is the probability that a defect is identified and resolved prior to the HUD inspection. To quantify the impact of audit efficacy on compliance risk, $\alpha_\text{audit}$ was varied from $0.05$ (negligent) to $0.95$ (highly rigorous), executing $K=1,000$ Monte Carlo iterations per step.
-
-@fig-audit-ridges provides a visual summary of the resulting score distributions, bounded by a red failure threshold at 60.
+To quantify the impact of audit efficacy on compliance risk, $\alpha_\text{audit}$ was varied from 0.05 to 0.95, executing $K=1,000$ Monte Carlo iterations per step. @fig-audit-ridges provides a visual summary of the resulting score distributions, bounded by a red failure threshold at 60.
 
 ```{r}
 #| label: fig-audit-ridges
@@ -153,7 +150,7 @@ plot_sensitivity_ridges(
 ```
 
 
-Failure risk is almost completely eliminated when $\alpha_\text{audit} \geq 0.90$. @fig-distribution-slice further illustrates the transition from high to low risk as $\alpha_\text{audit}$ increases from 0.55 to 0.85. Failure risk is estimated by the proportion of the 1,000 simulations yielding a score below 60, represented visually by the area under the density curve to the left of the red critical line.
+Failure risk is almost completely eliminated when $\alpha_\text{audit} \geq 0.90$. @fig-distribution-slice further illustrates the transition from high to low risk as $\alpha_\text{audit}$ increases from 0.55 to 0.85. Failure risk is estimated by the proportion of the 1,000 simulations yielding a score below 60, represented visually by the area under the density curve to the left of the red line. 
 
 
 ```{r}
@@ -189,7 +186,7 @@ plots[[1]] | plots[[2]]
 ```
 
 
-Tracking these probabilities across all values of $\alpha_\text{audit}$ yields @fig-failure-audit. The data demonstrates that critical failure risk (score < 30) is only marginalized when the audit catch rate exceeds 0.75, while full protection against standard failure (score < 60) requires efficacy above 0.90. This reflects the fact that HUD's unit sampling schemes (see @tbl-hud-sampling) have been designed so as to remove the possibility of a lucky draw.
+Tracking these probabilities across all values of $\alpha_\text{audit}$ yields @fig-failure-audit. The data demonstrates that critical failure risk (score < 30) is only marginalized when the audit catch rate exceeds 0.75, while full protection against standard failure (score < 60) requires efficacy above 0.90. This reflects the fact that HUD's unit sampling schemes (see @tbl-hud-sampling) have been designed to remove the possibility of a lucky draw. 
 
 ```{r}
 #| label: fig-failure-audit
@@ -212,7 +209,7 @@ plot_sensitivity_multi(
 ```
 
 
-Beyond baseline failure probabilities, the tail-drop metric $\tau$ (@eq-tau) measures downside volatility. To understand its sensitivity to $\alpha_\text{audit}$, we first examine how other score statistics evolve across the parameter range, as displayed in @fig-dist-stats-audit.
+While failure probabilities measure the likelihood of non-compliance, they do not capture the severity of worst-case outcomes. To quantify this downside risk, we use the tail-drop metric $\tau$ (@eq-tau). This metric provides a simple summary of the gap between the expected median score and a "bad day" (the 5th percentile worst-case scenario). To understand how $\tau$ responds to audit efficacy, we first examine how the underlying score statistics evolve in @fig-dist-stats-audit.
 
 ```{r}
 #| label: fig-dist-stats-audit
@@ -235,7 +232,9 @@ plot_sensitivity_multi(
 ```
 
 
-As $\alpha_\text{audit}$ exceeds 0.25, the median score rises linearly. Once $\alpha_\text{audit}$ climbs above 0.45, the 5th percentile score ($P_{05}$) also rises, but with a steeper slope. This narrows the gap between the median and the worst-case outcomes. This variance compression—also reflected by the decreasing standard deviation—drives the profile of the tail-drop metric $\tau$, displayed in @fig-tau-audit.
+As $\alpha_\text{audit}$ exceeds 0.25, the median score rises linearly. Once $\alpha_\text{audit}$ climbs above 0.45, the 5th percentile score ($P_{05}$) also rises, but at a steeper rate. This accelerated improvement at the bottom end narrows the gap between the median and the worst-case outcomes. This variance compression—also reflected by the decreasing standard deviation—drives the profile of the tail-drop metric $\tau$, displayed in @fig-tau-audit.
+
+In short, a small $\tau$ indicates high operational predictability: it guarantees that even on a worst-case inspection day, the final score will not fall far below expectations.
 
 ```{r}
 #| label: fig-tau-audit
@@ -260,9 +259,9 @@ plot_sensitivity_multi(
 
 ### Conclusions
 
-* **Operational Futility Threshold ($\alpha_\text{audit} \leq 0.25$)**: Below ~25% efficacy, quality assurance efforts are mathematically invisible to the final metric due to the absolute scoring floor (0).
-* **Variance Squeeze ($0.45 < \alpha_\text{audit} < 0.90$)**: As the catch rate rises above 0.45, the 5th percentile worst-case outcome ($P_{05}$) improves at a faster linear rate than the median. This compresses the score variance and significantly reduces the Tail Drop metric ($\tau$).
-* **Safety Baseline ($\alpha_\text{audit} \geq 0.90$)**: To confidently eliminate standard regulatory failure risk (score < 60), the internal audit process must successfully intercept at least 90% of all pre-existing defects.
+* **Futility Threshold ($\alpha_\text{audit} \leq 0.25$)**: Below 25% efficacy, quality assurance efforts provide no measurable benefit. Because of the absolute scoring floor (0), low-efficacy audits fail to improve the final inspection outcome.
+* **Volatility Reduction ($0.45 < \alpha_\text{audit} < 0.90$)**: As the catch rate exceeds 0.45, the worst-case outcomes ($P_{05}$) improve faster than the median score. This compresses the overall score variance and rapidly drives down the Tail Drop metric ($\tau$), meaning that the final outcome is more predictable.
+* **Compliance Baseline ($\alpha_\text{audit} \geq 0.90$)**: To reliably eliminate the risk of regulatory failure (a score below 60), the internal audit process must intercept at least 90% of pre-existing defects.
 
 
 ## 2.3 The Time Crunch: Notice of Inspection ($t_\text{start}$)

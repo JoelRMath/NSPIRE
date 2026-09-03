@@ -1,0 +1,49 @@
+---
+title: "README"
+output: html_document
+---
+
+# NSPIRE Simulation Engine
+
+This repository contains an Operations Research prototype designed to model HUD NSPIRE inspections and the preceding operational workflows required to prepare for them. The framework utilizes Monte Carlo simulations and Directed Acyclic Graphs (DAGs) to quantify operational risk, schedule compression, and spatial heterogeneity in property maintenance.
+
+## Documentation
+
+For a comprehensive overview of the methodology, mathematical framework, and operational conclusions, please refer to the primary [Technical Report](vignettes/report.qmd) located in the `vignettes/` subdirectory.
+
+## Architecture
+
+The simulation engine is built in **R** using formal **S4 class structures**.
+
+* **`InspectionDAG`**: Parses and enforces the strict topological sorting and prerequisites of maintenance tasks.
+* **`SimulationEngine`**: Executes core logic for stochastic defect decay, Beta-PERT mixture time sampling, and spatial vendor lockouts.
+* **`MonteCarloWrapper`**: Manages the stochastic sampling of units and aggregates independent inspection realizations to calculate downside risk metrics, including the Tail Drop metric ($\tau$).
+
+## Repository Structure
+
+The mathematical logic is decoupled from hardcoded operational assumptions, allowing the framework to be adapted to different properties or regulatory environments via external configuration files.
+
+* `R/`: Core S4 class definitions and simulation functions (`InspectionDAG.R`, `SimulationEngine.R`, `MonteCarloWrapper.R`).
+* `inst/extdata/`: Master configuration matrices.
+  * `tasks_config.csv`: Baseline defect rates, stochastic duration model parameters, and DAG dependencies.
+  * `scoring_config.csv`: Regulatory point deduction weights and failsafe limits.
+  * `floorplans_config.csv`: Spatial organization of inspectable physical assets.
+* `vignettes/`: Technical documentation and analysis.
+  * `report.qmd`: The primary Quarto source file.
+  * `scenario1.yml`: Global operational constraints (labor capacities, transit friction, audit efficacy) controlling the simulation environment.
+
+## Usage and Reproduction
+
+To execute the Monte Carlo engine and render the technical report:
+
+1. Ensure **R** and **Quarto** are installed.
+2. Install the required R dependencies (e.g., `igraph`, `visNetwork`, `DT`).
+3. Render the report via the command line or your IDE:
+
+```bash
+quarto render vignettes/report.qmd
+```
+
+## Licence
+
+[MIT License](LICENSE)

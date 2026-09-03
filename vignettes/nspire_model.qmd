@@ -62,12 +62,12 @@ Ultimately, this document serves as a proof-of-concept for the utility of [Opera
 
 Specifically, the simulation reveals the following findings. These insights were not explicitly programmed; rather, they emerged as mathematical consequences of model component interactions:
 
-*   **The Hidden Labor Tax:** Idealized time estimates fail in practice. Incorporating 5-minute intra-unit tool transitions and 15-minute inter-unit transit times introduces a 34% expansion in required labor hours, referred to here as the Operational Reality Gap (@fig-transit-friction).
-*   **The Quality Assurance Floor:** Internal pre-inspections require efficacy. The model demonstrates that teams must intercept at least 90% of existing defects to eliminate regulatory failure risk. Conversely, an audit catch rate below 25% offers zero protection against the scoring floor (@fig-failure-audit).
-*   **The Overtime Illusion:** Capital cannot bypass physical scheduling limits. Compressing preparation timelines below 15 days forces the workforce into a capacity deficit ("backlog cliff"). At this threshold, authorizing maximum overtime expenditure cannot prevent regulatory failure (@fig-time-crunch-labor and @fig-time-crunch-backlog).
+*   **Hidden Labor Tax:** Idealized time estimates fail in practice. Incorporating 5-minute intra-unit tool transitions and 15-minute inter-unit transit times introduces a 34% expansion in required labor hours, referred to here as the Operational Reality Gap (@fig-transit-friction).
+*   **Quality Assurance Floor:** Internal pre-inspections require efficacy. The model demonstrates that teams must intercept at least 90% of existing defects to eliminate regulatory failure risk. Conversely, an audit catch rate below 25% offers zero protection against the scoring floor (@fig-failure-audit).
+*   **Overtime Illusion:** Capital cannot bypass physical scheduling limits. Compressing preparation timelines below 15 days forces the workforce into a capacity deficit ("backlog cliff"). At this threshold, authorizing maximum overtime expenditure cannot prevent regulatory failure (@fig-time-crunch-labor and @fig-time-crunch-backlog).
 *   **Non-Linear Staffing Surges:** Due to task dependencies and spatial lockouts, compressed timelines demand an exponential increase in headcount to execute parallel workflows. Halving a preparation schedule from 14 days to 7 days does not double the required workforce; it multiplies it by a factor of six (@fig-staffing-curve).
-*   **The Post-Prep Decay Penalty:** Completing repairs too early introduces physical decay risk that behaves as a threshold rather than a gradual slope. The model identifies an approximate 20-day window where median scores remain stable and failure probabilities stay near zero. Following this window, defect re-emergence accelerates, dropping the 5th percentile worst-case score steeply. Compliance requires "just-in-time" scheduling: preparations must start early enough to avoid capacity exhaustion, but finish late enough to remain within this decay threshold (@fig-decay-score, @fig-decay-risk).
-*   **The Lottery Effect:** HUD’s random sampling protocol mathematically penalizes spatial variance. A localized cluster of destructive tenants in an otherwise standard building triples the probability of catastrophic inspection failure (@fig-tenant-risk). Mitigating this requires targeting high-risk units during the internal audit. We hypothesize that "silent" units—those with unusually low historical service request rates—could serve as a predictive proxy for hidden defects. Validating this hypothesis represents an opportunity for future analysis using historical work-order data.
+*   **Post-Prep Decay Penalty:** Completing repairs too early introduces physical decay risk that behaves as a threshold rather than a gradual slope. The model identifies an approximate 20-day window where median scores remain stable and failure probabilities stay near zero. Following this window, defect re-emergence accelerates, dropping the 5th percentile worst-case score steeply. Compliance requires "just-in-time" scheduling: preparations must start early enough to avoid capacity exhaustion, but finish late enough to remain within this decay threshold (@fig-decay-score, @fig-decay-risk).
+*   **Lottery Effect:** HUD’s random sampling protocol mathematically penalizes spatial variance. A localized cluster of destructive tenants in an otherwise standard building triples the probability of catastrophic inspection failure (@fig-tenant-risk). Mitigating this requires targeting high-risk units during the internal audit. We hypothesize that "silent" units—those with unusually low historical service request rates—could serve as a predictive proxy for hidden defects. Validating this hypothesis represents an opportunity for future analysis using historical work-order data.
 
 Section 2 explores the results obtained with simulations, detailing the specific thresholds where standard preparation strategies fail. For readers interested in the structural logic of the model, the mathematical architecture and simulation mechanics—including the Directed Acyclic Graph (DAG) workflow mapping—are detailed in Section 3, prior to the appendices, which provide modeling parameters and simulator code.
 
@@ -209,7 +209,7 @@ plot_sensitivity_multi(
 ```
 
 
-While failure probabilities measure the likelihood of non-compliance, they do not capture the severity of worst-case outcomes. To quantify this downside risk, we use the tail-drop metric $\tau$ (@eq-tau). This metric provides a simple summary of the gap between the expected median score and a "bad day" (the 5th percentile worst-case scenario). To understand how $\tau$ responds to audit efficacy, we first examine how the underlying score statistics evolve in @fig-dist-stats-audit.
+While failure probabilities measure the likelihood of non-compliance, they do not capture the severity of worst-case outcomes. To quantify this downside risk, we use the tail-drop metric $\tau$ (@eq-tau). This metric provides a simple summary of the gap between the expected median score and a "bad day" (the 5th percentile worst-case scenario) relative to the median. It is therefore quantifying the relative uncertainty, or volatility, of the inspection score. To understand how $\tau$ responds to audit efficacy, we first examine how the underlying score statistics evolve in @fig-dist-stats-audit.
 
 ```{r}
 #| label: fig-dist-stats-audit
@@ -264,13 +264,13 @@ plot_sensitivity_multi(
 * **Compliance Baseline ($\alpha_\text{audit} \geq 0.90$)**: To reliably eliminate the risk of regulatory failure (a score below 60), the internal audit process must intercept at least 90% of pre-existing defects.
 
 
-## 2.3 The Time Crunch: Notice of Inspection ($t_\text{start}$)
+## 2.3 Time Constraints: Notice of Inspection ($t_\text{start}$)
 
-While a robust audit catch rate ($\alpha_\text{audit}$) is critical for passing an NSPIRE inspection, it assumes the maintenance team has the physical time to execute the repairs. HUD inspection notices can vary drastically, sometimes providing as little as 14 to 30 days of warning.
+A successful NSPIRE inspection assumes the maintenance team has adequate time to complete necessary repairs. However, HUD inspection notices can vary significantly, often providing only 14 to 30 days of warning.
 
-To model this operational squeeze, the preparation window ($t_\text{start}$) was swept from 36 days down to 4 days. For this specific scenario, the internal audit catch rate was fixed at a highly effective 85% ($\alpha_\text{audit} = 0.85$), and maximum allowable overtime was expanded to 4 hours per unit per day. Crucially, the simulation incorporates context-aware transit friction: technicians incur small delays (1–5 minutes) when moving between tasks in the same unit, but significant delays (15–30 minutes) when packing up and accessing a new unit.
+To model this schedule compression, the days of notice ($t_\text{start}$) was varied from 36 days down to 4 days. For this scenario, the internal audit catch rate was fixed at 85% ($\alpha_\text{audit} = 0.85$), and the maximum allowable overtime was set to 4 hours per unit per day. The simulation continues to incorporate the transit friction defined in Section 2.1: technicians incur minor delays (1–5 minutes) moving between tasks in the same unit, and larger delays (15–30 minutes) when transitioning to a new unit.
 
-As the preparation window shrinks, the volume of identified defects remains constant, but the time available to clear them—and the time available to walk between them—compresses. 
+As $t_\text{start}$ decreases, the volume of identified defects remains constant, but the time available to both execute repairs and transit between locations compresses.
 
 ```{r}
 #| label: fig-time-crunch-ridges
@@ -295,10 +295,9 @@ plot_sensitivity_ridges(
 )
 ```
 
+As visualized in @fig-time-crunch-ridges, the score distribution remains stable when $t_\text{start} \geq 28$. However, as the notice period decreases, the distribution broadens and shifts negatively, ultimately falling entirely below the passing threshold.
 
-As visualized in @fig-time-crunch-ridges, the score distribution remains stable when $t_\text{start} \geq 28$. However, as time compresses, the distribution stretches heavily to the left before completely fracturing and collapsing into the failure zone.
-
-The initial impact is purely financial, as visualized in @fig-time-crunch-labor.
+The initial impact of this schedule compression is financial, as shown in @fig-time-crunch-labor.
 
 ```{r}
 #| label: fig-time-crunch-labor
@@ -321,9 +320,9 @@ plot_sensitivity_multi(
 ```
 
 
-At first glance, the left side of @fig-time-crunch-labor appears counter-intuitive: as the preparation window drops below 20 days, the total expected cost plunges dramatically. This is not an efficiency gain; it is the mathematical manifestation of deferred maintenance (backlog: tasks that cannot be done before inspection day).
+The left side of @fig-time-crunch-labor presents a seemingly counter-intuitive trend: as the notice period drops below 20 days, total expected costs decrease sharply. This reduction does not reflect efficiency gains; rather, it quantifies deferred maintenance—a backlog of tasks that cannot be completed prior to the inspection.
 
-Reading the figure from right to left as the timeline compresses, between Day 30 and Day 22 the workforce heavily leverages their overtime allowance to keep pace with the workload. At Day 22, the system hits peak labor output—the team operates at absolute maximum capacity, driving overtime spend to its highest point. However, as the window shrinks below 20 days, the physical capacity of the workforce is exhausted. Items are forced into the backlog. Because abandoned items incur no labor or material costs, they create a false 'economy' of savings.
+Tracing the timeline from right to left, the workforce increasingly utilizes overtime between Days 30 and 22 to match the workload. At Day 22, the system reaches peak labor output, maximizing both physical capacity and overtime expenditure. As the window shrinks below 20 days, labor limits are exceeded, forcing tasks into the backlog. Because uncompleted items incur no labor or material costs, they generate an artificial reduction in expected expenditures.
 
 @fig-time-crunch-backlog illustrates the regulatory consequences of this capacity exhaustion.
 
@@ -346,7 +345,7 @@ plot_sensitivity_multi(
 ```
 
 
-Finally, we map the Tail Drop metric ($\tau$) as a function of the preparation window. This demonstrates how temporal limits affect the volatility of outcomes.
+Finally, we map the Tail Drop metric ($\tau$) as a function of the preparation window (@fig-time-crunch-tau). This demonstrates how temporal limits affect the volatility of outcomes.
 
 ```{r}
 #| label: fig-time-crunch-tau
@@ -366,17 +365,21 @@ plot_sensitivity_multi(
 )
 ```
 
+Finally, we map the Tail Drop metric ($\tau$) as a function of the notice period (@fig-time-crunch-tau) to demonstrate how temporal limits affect outcome volatility. As the schedule compresses below 20 days, $\tau$ sharply increases to its maximum value, meaning that any predictability in the inspection score completely disappears.
+
 ### Conclusions
 
-* **Distributed Defect Tax ($t_\text{start} \geq 28$)**: Because repairing widely distributed defects incurs a heavy transit-time penalty, a 28-day notice is the edge of the safe operational limit for this property. At 28 days, the property maintains a near 0% failure risk with minimal overtime expenditure.
+* **Safe Operational Limit ($t_\text{start} \geq 28$)**: Due to the transit-time penalty inherent in distributed repairs, a 28-day notice represents the minimum safe operational window for this baseline property. At 28 days, failure risk remains near 0% with minimal overtime expenditure.
 
-* **Maximum Effort Peak ($t_\text{start} \approx 22$)**: Day 22 represents the system's breaking point. Overtime spend reaches its absolute maximum as the team attempts to outwork the shrinking timeline. Despite spending heavily on premium labor, the backlog probability reaches ~50%, and the property begins to exhibit a measurable risk of regulatory failure. The team is throwing maximum capital at the problem but is still losing ground.
+* **Resource Saturation ($t_\text{start} \approx 22$)**: Day 22 marks the system's capacity threshold. Overtime expenditure peaks as the workforce maximizes output against the compressed schedule. Despite this maximum capital allocation, backlog probability reaches 50%, and a measurable risk of regulatory failure emerges.
 
-* **Operational Collapse ($t_\text{start} \leq 15$)**: A standard 14-day HUD notice is mathematically unfeasible for a property in this condition with a baseline 5-technician crew. By Day 15, task backlog probability hits 100%, and failure risk exceeds 85%. The observed plunge in total costs is simply a trivial reflection of this abandoned work. When a short timeline is fixed, a static crew size guarantees failure. The immediate operational question then becomes: if the schedule cannot be extended, exactly how much must we expand the crew to avoid collapse?
+* **Capacity Exhaustion ($t_\text{start} \leq 15$)**: A standard 14-day HUD notice is unfeasible for the baseline technician crew of this property. By Day 15, task backlog probability reaches 100%, and failure risk exceeds 85%. The observed drop in total costs reflects abandoned work. Given a fixed short timeline, a static crew guarantees failure, prompting the next operational question: how much must the workforce scale to clear the backlog?
 
 ## 2.4 Staffing Requirements: The Capacity Curve
 
-Having established in Section 2.3 that a compressed timeline leads to capacity exhaustion, the model can be inverted to estimate necessary staffing levels. By decoupling labor constraints from the audit catch rate, we can ask a specific operational question: Given a fixed preparation window, what is the minimum headcount required to achieve a 99.9% probability of clearing the known backlog? Using a binary search algorithm wrapped around the Monte Carlo engine ($K=1,000$ iterations per step), we mapped the required workforce capacity as the timeline collapses. A strict operational threshold ($P(\text{Backlog} > 0) \le 0.001$) was targeted to ensure the estimated staffing levels are mathematically robust.
+Having established that a compressed schedule leads to capacity exhaustion, the model can be inverted to estimate necessary staffing levels. While targeting a specific inspection score might seem intuitive, a passing score is not guaranteed by labor alone; if the audit catch rate is too low, the property may fail regardless of crew size. Therefore, the chosen target is the backlog value, which, given a notice period, is determined by crew size. For a given audit catch rate, we ask a specific question: what is the minimum headcount required to achieve a 99.9% probability of clearing all identified repairs?
+
+Using a binary search algorithm wrapped around the Monte Carlo engine ($K=1,000$ iterations per step), we mapped the required workforce capacity to reach the target backlog—$P(\text{Backlog} > 0) \le 0.001$—as a function of the notice period. 
 
 ```{r}
 #| label: fig-staffing-curve
@@ -409,21 +412,21 @@ ggplot2::ggplot(staffing_df, ggplot2::aes(x = t_start, y = required_techs)) +
 ```
 
 
-As demonstrated in @fig-staffing-curve, the resulting capacity curve is highly non-linear. With a generous notice period (20 to 25 days), a small baseline crew of two technicians easily absorbs the transit friction and completes the repairs. However, dropping below the 15-day threshold triggers an exponential surge in labor demand. To prepare this property in under a week, simply authorizing overtime is mathematically insufficient; management must instantly deploy a coordinated team of over 20 technicians.
+As demonstrated in @fig-staffing-curve, the resulting capacity curve is non-linear. With a notice period of 20 to 25 days, a baseline crew of two technicians can complete the repairs. However, dropping below the 15-day threshold triggers an exponential surge in labor demand. To prepare this property in under a week, authorizing overtime is insufficient; management must deploy a team of over 20 technicians.
 
 ### Conclusions
 
-* **Non-Linear Labor Demand**: The relationship between time and labor is not linear. Halving the preparation window from 14 days to 7 days does not simply double the required workforce; it multiplies it by a factor of six.
+* **Non-Linear Labor Demand**: The relationship between available time and required labor is non-linear. Halving the notice period from 14 days to 7 days does not simply double the required workforce; it multiplies it by a factor of six.
 
 * **Quantifying Delay**: This analysis provides a mathematical framework to estimate the required headcount and the operational cost of a delayed response.
 
 ## 2.5 Post-Prep Decay: The "Too Early" Penalty ($t_\text{end}$)
 
-In Section 2.3, we established that compressing the preparation timeline forces a property into a backlog cliff due to physical labor limits. A common operational response to this risk is to overcompensate by completing all pre-inspection repairs well in advance.
+In Section 2.3, we established that a compressed schedule causes capacity exhaustion. A common operational response to this constraint is to complete all pre-inspection repairs as early as possible.
 
-However, residential properties are dynamic, entropic environments. The time gap between the completion of repairs ($t_\text{end}$) and the actual day of the HUD inspection exposes the property to a natural re-accumulation of defects.
+However, residential properties are dynamic environments subject to continuous wear. The time gap between the completion of repairs ($t_\text{end}$) and the actual day of the HUD inspection exposes the property to a natural re-accumulation of defects. 
 
-To quantify this temporal decay risk, $t_\text{end}$ was swept from 0 days (repairs finish the morning of the inspection) up to 35 days. To isolate the effect of decay from capacity constraints, the starting notice ($t_\text{start}$) was locked at 45 days, ensuring the team had abundant capacity and zero backlog risk.
+To quantify this temporal decay risk, $t_\text{end}$ was varied from 0 to 35 days prior to the inspection. To isolate the effect of decay from capacity constraints, the notice period ($t_\text{start}$) was fixed at 45 days, ensuring the maintenance team had sufficient capacity and zero backlog risk. 
 
 @fig-decay-score illustrates the erosion of the property's safety margin as this time gap widens.
 
@@ -447,9 +450,9 @@ plot_sensitivity_multi(
 )
 ```
 
-As visualized in @fig-decay-score, the score does not degrade at a steady, linear rate. Instead, the property exhibits strong resilience for the first three weeks, maintaining stable median and $P_{05}$ scores up to $t_\text{end} \approx 25$. Beyond 25 days, however, the score plunges rapidly. This indicates that temporal decay has a threshold effect: accumulating minor wear-and-tear is initially absorbable, but as time passes, the compounding probability of a critical life-safety system (e.g., a smoke detector or GFCI outlet) failing at random reaches a critical mass.
+As visualized in @fig-decay-score, the score does not degrade at a linear rate. Instead, the property exhibits stability for the first three weeks, maintaining consistent median and $P_{05}$ scores up to $t_\text{end} \approx 25$. Beyond 25 days, the score declines sharply. This indicates that temporal decay behaves as a threshold: accumulating minor wear is initially absorbable, but as time passes, the compounding probability of a critical life-safety system (e.g., a smoke detector or GFCI outlet) failing reaches a critical mass. 
 
-@fig-decay-risk visualizes how this sudden score erosion translates into concrete regulatory failure.
+@fig-decay-risk illustrates how this score reduction translates into regulatory failure risk.
 
 ```{r}
 #| label: fig-decay-risk
@@ -471,27 +474,19 @@ plot_sensitivity_multi(
 
 ### Conclusions
 
-**Decay Cliff**: Completing preparations too early introduces severe mathematical risk, manifesting as a "cliff" rather than a steady slope. The data demonstrates that a property remains relatively safe if it sits idle for up to three weeks. However, a property, characterized by the parameters used here, that is highly likely to pass at $t_\text{end} = 0$ exhibits an exponential spike in failure risk if left idle beyond 25 days, reaching near-certain failure by day 35.
+**Decay Threshold**: Completing preparations too early introduces significant compliance risk that manifests as a threshold rather than a linear progression. The data demonstrates that a property remains stable if idle for up to three weeks. However, under the baseline parameters, a property with a near-zero failure risk at $t_\text{end} = 0$ exhibits an exponential increase in failure probability if left idle beyond 25 days, reaching near-certain failure by day 35.
 
-**"Goldilocks" Prep Window**: Combined with the capacity insights from Section 5, these results define a rigid operational window. A maintenance team must start late enough to avoid an excessive decay penalty ($t_\text{end} \le 25$ days) but early enough to avoid capacity exhaustion ($t_\text{start}$ constraint). Maximizing NSPIRE performance requires precise "just-in-time" repair scheduling.
+**Optimal Execution Window**: Combined with the capacity insights from Section 2.4, these results define a strict operational window. A maintenance team must start late enough to avoid an excessive decay penalty ($t_\text{end} \le 25$ days) but early enough to avoid capacity exhaustion ($t_\text{start}$ constraint). Maximizing NSPIRE performance requires precise, "just-in-time" repair scheduling. 
 
 ## 2.6 Spatial Heterogeneity and the "Lottery Effect" {#sec-tenant-mix}
 
-NSPIRE scores are heavily influenced by the spatial distribution of defects. HUD's sampling protocol selects a subset of units to represent the entire property. While mathematically sound for uniformly maintained properties, it introduces massive variance—the "Lottery Effect"—in properties with severe tenant heterogeneity.
+NSPIRE scores are highly sensitive to the spatial distribution of defects. HUD's sampling protocol selects a subset of units to represent the entire property. While reliable for uniformly maintained buildings, this sampling introduces significant variance—the "Lottery Effect"—in properties with tenant heterogeneity.
 
-To quantify this, the proportion of clean tenants ($p$) was varied from 1.00 (homogeneous) down to 0.70. To isolate the sampling risk and ensure we were not artificially degrading the building's overall quality, a dynamic balancing equation was used. We enforced a strict "Conservation of Defects" by fixing the global expected severity multiplier at 1.0. For this analysis, the internal audit catch rate was set to 0.75 ($\alpha_\text{audit} = 0.75$), and the Monte Carlo engine executed 100,000 independent iterations per step to ensure high-resolution estimation of the extreme tails.
+To quantify this, the proportion of standard, low-impact tenants was varied from 100% (perfectly homogeneous) down to 70%. To isolate the risk of sampling variance and ensure the building's overall quality was not artificially degraded, the simulation enforced a strict "Conservation of Defects". As destructive tenants were introduced into the model to generate defect clusters, the baseline multiplier for the remaining standard units was dynamically reduced to offset them. This balancing guarantees that the global expected severity remains constant, allowing the model to isolate the impact of spatial clustering.
 
-Let $p$ be the proportion of clean units and $R$ be the severity ratio of a destructive unit (set to $20.0$). The expected defect multipliers for clean units ($\mu_c$) and destructive units ($\mu_d$) must satisfy:
+For this analysis, the audit catch rate was fixed at 75% ($\alpha_\text{audit} = 0.75$), and the simulation executed 100,000 independent iterations per step to ensure high-resolution estimates of the extreme tails of score distribution.
 
-$$p \mu_c + (1 - p) \mu_d = 1.0$$
-
-By substituting $\mu_d = R \mu_c$, we dynamically calculate the baseline multiplier for the clean units for any given tenant mixture:
-
-$$\mu_c = \frac{1}{p + R(1 - p)}$$
-
-Consequently, as destructive tenants are introduced and generate severe defect clusters, standard units become proportionally cleaner to offset them.
-
-To explicitly measure how this sampling variance impacts regulatory risk, we apply the Tail Drop Median metric, $\tau$ (@eq-tau), which isolates the expansion of the left tail relative to the median score. @fig-tail-risk illustrates how this tail risk behaves as a function of the tenant mix.
+To measure how this spatial clustering impacts regulatory risk, we again apply the Tail Drop metric ($\tau$), which isolates the expansion of the worst-case outcomes relative to the median score. @fig-tail-risk illustrates how this downside risk behaves as a function of the tenant mix. 
 
 ```{r}
 #| echo: false
@@ -531,7 +526,7 @@ plot_sensitivity_multi(
 )
 ```
 
-Reading from right to left, as homogeneity breaks down, $\tau$ sharply increases, peaking near $p = 0.89$. This visualizes the core of the Lottery Effect: while the median score of the building remains relatively stable, the 5th percentile plummets. To understand the physical mechanisms driving this expansion—and its subsequent contraction at extreme heterogeneity—we must look at the physical defects themselves.
+Reading @fig-tail-risk from right to left, as homogeneity breaks down, the Tail Drop metric $\tau$ (@eq-tau)—which quantifies the unpredictability of the inspection score—sharply increases, peaking near $p = 0.89$. This visualizes the core of the Lottery Effect: while the median score of the building remains relatively stable, the 5th percentile worst-case score drops significantly, increasing the volatility measure $\tau$. To understand the physical mechanisms driving this expansion, and its subsequent contraction at extreme heterogeneity, we must examine the physical defects themselves.
 
 @fig-tenant-physics visualizes the physical state of the building prior to HUD scoring.
 
@@ -576,11 +571,11 @@ p1
 p2
 ```
 
-The data reveals a statistical paradox driven by physical constraints (Plot A). As the proportion of clean tenants increases (reading left to right), the balancing equation forces a shrinking number of destructive units to carry the mathematical burden. These few units quickly hit a physical ceiling—a single apartment can only harbor so many broken items. Consequently, excess theoretical defects are truncated, artificially dropping the building's total defect count to a minimum near $p = 0.93$.
+The data reveals an effect driven by physical constraints (Plot A). As the proportion of clean tenants increases (reading left to right), the balancing equation forces a shrinking number of destructive units to absorb the remaining defects. However, these few units quickly hit a physical ceiling, as a single apartment contains a limited number of inspectable items. Consequently, excess theoretical defects are truncated, causing the building's total defect count to artificially drop to a minimum near $p = 0.93$.
 
-Once $p$ pushes past $0.94$, the burden shifts back to the clean units, which can easily absorb the expected defects without truncation, allowing the total volume to rapidly rebound to its theoretical expectation. 
+Once $p$ exceeds $0.94$, the defect burden shifts back to the clean units. Because these standard units are numerous, they can easily absorb the expected defects without hitting physical truncation limits, allowing the total defect volume to rapidly rebound to its theoretical expectation.
 
-Crucially, the SD of defect count per unit (Plot B) peaks before collapsing. This peak represents the maximum disparity between clean and destructive units. Beyond this threshold, building-wide variance plummets due to two intertwined factors: a shrinking population of destructive units to act as outliers, and physical item caps that prevent those remaining units from absorbing extreme defect multipliers.
+Crucially, the standard deviation of the defect count per unit (Plot B) peaks just before this collapse. This peak represents the maximum spatial disparity between standard and destructive units. Beyond this threshold, building-wide variance decreases sharply due to two intertwined factors: a shrinking population of destructive units, and physical item caps that prevent the remaining destructive units from absorbing disproportionate defect load.
 
 @fig-tenant-risk demonstrates how this physical clustering translates into regulatory failure.
 
@@ -606,9 +601,9 @@ Despite the highly heterogeneous building containing fewer total physical defect
 
 ### Conclusions
 
-**The Lottery Effect is Real** Under the NSPIRE scoring protocol, you cannot "average out" a destructive tenant. Because HUD's divisor is based on a sample size, stepping into just one or two heavily concentrated units will instantly drag an otherwise pristine property below a passing score.
+**Lottery Effect** Under the NSPIRE scoring protocol, the impact of a destructive tenant cannot be averaged out. Because HUD's scoring relies on a random sample, selecting just one or two heavily degraded units can immediately drop an otherwise pristine property below a passing threshold.
 
-**Targeted Pre-Inspections** A property with fewer total defects but high clustering is statistically more dangerous than a uniformly degraded property. If management is aware of specific high-impact tenants, those specific units could be audited and repaired at a 100% catch rate prior to the inspection, as they pose a disproportionate threat. A potential way to proactively identify these "dirty" units is to look for historically low rates of tenant service requests, which often mask severe deferred maintenance. This is a hypothesis that might be worth testing with historical data on service requests.
+**Targeted Pre-Inspections** A property with fewer total defects but high spatial clustering carries a higher statistical risk of failure than a uniformly degraded property. If management can identify high-impact tenants, those specific units should be prioritized for targeted audits and repairs, as they pose a disproportionate threat. A potential proactive strategy to identify these high-risk units is to monitor for historically low rates of tenant service requests, which often mask severe deferred maintenance—a hypothesis that merits testing with historical service request data.
 
 # 3 Methodology & Mathematical Framework
 
@@ -622,7 +617,7 @@ The inspection divides a property into distinct locations and evaluates defects 
 * **Location:** $l \in \{\text{Unit}, \text{Inside}, \text{Outside}\}$
 * $N$: Total number of units in the property.
 * $n(N)$: The HUD-mandated sample size function, where $n$ is a discrete function of $N$.
-* $C_{s,l}$: True total count of defects existing in the property.
+* $C_{s,l}$: Total count of defects existing in the property.
 * $c_{s,l}$: Observed count of defects recorded during the inspection.
 * $w_{s,l}$: Static point weight (penalty) assigned to a defect.
 
@@ -637,23 +632,22 @@ $$D = \sum_{s} \sum_{l \in \{\text{Inside}, \text{Outside}\}} (c_{s,l} \cdot w_{
 The base score originates at 100 and is bounded at zero using the Heaviside step function $H(x)$:
 
 $$S_{raw} = (100 - D) \cdot H(100 - D)$$
-which is a negative "kill-switch" defined by
+which acts as a zero-bound constraint defined by:
 $$H(x) = \begin{cases} 1 & \text{if } x \ge 0 \\ 0 & \text{otherwise} \end{cases}$$
 
 ### Operational Compliance Function (Failsafe)
 
-A score $\ge 60$ mathematically passes, but the presence of **any** Life-Threatening (LT) defect forces an immediate 24-hour mitigation compliance failure. Let $n_{LT}$ represent the total observed LT defects:
+A score $\ge 60$ mathematically passes, but the presence of any Life-Threatening (LT) defect forces an immediate 24-hour mitigation compliance failure. Let $n_{LT}$ represent the total observed LT defects:
+$$n_{LT} = \sum_{l} c_{\text{LT},l}$$
 
-$$n_{LT} = \sum_{l} c_{\text{LT},l}$$.
-
-We model this regulatory mandate as a mathematical "kill switch" called the Heaviside function $H(x)$ and defined above. Namely, if even one LT defect is observed ($n_{LT} \ge 1$), the term $(0.5 - n_{LT})$ becomes negative. This drives the function to output a zero, instantly failing the property regardless of its raw score:
+We model this regulatory mandate as a strict compliance bound using the Heaviside function $H(x)$ defined above. Namely, if even one LT defect is observed ($n_{LT} \ge 1$), the term $(0.5 - n_{LT})$ becomes negative. This drives the function to output a zero, resulting in an automatic failure regardless of the raw score:
 $$S_{eff} = S_{raw} \cdot H(0.5 - n_{LT})$$
 
 ## 3.2 Probabilistic Sampling and Realizations
 
-The inspection score is not a single, guaranteed number (a deterministic value). Instead, it is a **random variable**, representing the final outcome of many smaller random events—much like rolling a pair of dice. For example, whether the kitchen GFCI in Unit 1 happens to break today is a random event; whether the HUD inspector randomly chooses to inspect Unit 1 is another.
+The inspection score is not a single deterministic value). Instead, it is a **random variable**, modeling the final outcome of multiple stochastic events. For example, whether a specific kitchen GFCI fails prior to the inspection is a stochastic physical event; whether the HUD inspector randomly selects that specific unit for evaluation is a stochastic sampling event.
 
-Because of this randomness, running a single simulation (rolling the dice once) is not very informative. However, by running thousands of virtual inspections, called Monte Carlo simulations, we can build a complete score distribution. This allows us to move beyond guessing and mathematically estimate probabilities, such as the risk of failing the inspection (scoring below 60).
+Due to this variance, executing a single simulation realization provides insufficient information. However, by running thousands of virtual inspections via Monte Carlo simulations, we generate a comprehensive score distribution. This allows the model to move beyond deterministic point estimates and mathematically quantify probabilities, such as the risk of regulatory non-compliance (scoring below 60).
 
 ### Stochastic Unit Sampling
 
@@ -719,19 +713,21 @@ datatable(
 )
 ```
 
-In massive high-rise properties ($N > 100$), the inspection score tends to be highly stable because extreme outcomes naturally "average out" (Law of Large Numbers). However, for small to mid-sized properties ($N \leq 50$), this random sampling creates much larger relative variations. Because the inspector is pulling a random handful of units, the defects they happen to stumble upon ($c_{s,\text{Unit}}$) can be drastically better or worse than the actual overall condition of the building ($C_{s,\text{Unit}}$). This "luck of the draw" drives a wider spread of possible final scores in small to mid-sized properties.
+In high-rise properties ($N > 100$), the inspection score tends to be highly stable because extreme outcomes naturally converge toward the expected value (Law of Large Numbers). However, for small to mid-sized properties ($N \leq 50$), this random sampling creates significant relative variations. Because the inspector evaluates a limited subset of units, the observed defect count ($c_{s,\text{Unit}}$) can deviate substantially from the actual overall condition of the building ($C_{s,\text{Unit}}$). This sampling variance drives a wider spread of possible final scores in mid-sized properties.
 
 ### Realization of Deductions
 
 Let $I_{u}$ be an indicator variable for unit $u$, that is, $I_u = 1$ if unit $u$ is selected for inspection, and $0$ otherwise. The observed defect count $c_{s,\text{Unit}}$ for a specific simulation realization $\omega$ is defined by the subset of selected units:
 $$c_{s,\text{Unit}}(\omega) = \sum_{u=1}^{N} I_u(\omega) \cdot \mathbb{1}(\text{unit } u \text{ has defect } s)$$
-where $\mathbb{1}(\text{statement})$ is 1 if $\text{statement}$ is true and 0 otherwise.The model calculates the realization $D(\omega)$ for each simulation $k$ in the Monte Carlo ensemble. The set of all realizations records the variance, inherent in the sampling process, which is the primary driver of the "lottery effect" in mid-sized properties.
+where $\mathbb{1}(\text{statement})$ is 1 if $\text{statement}$ is true and 0 otherwise.The model calculates the realization $D(\omega)$ for each simulation $k$ in the Monte Carlo ensemble. The set of all realizations records the variance, inherent in the sampling process, which is the primary driver of sampling volativity in mid-sized properties.
 
 ### Task Execution Times and Mixture Distributions
 
-Just as the inspector's choice of units is random, the time required to complete a maintenance task is never a fixed number.To model this physical reality, we treat execution time $t_i$ as a random variable drawn from a bounded Beta-PERT (Program Evaluation and Review Technique) distribution. PERT is widely used in project management because it relies on three intuitive estimates: an optimistic minimum ($a$), a most likely mode ($m$), and a pessimistic maximum ($b$).However, tasks often exist in distinctly different physical states. Consider a sink drain: it might simply require a quick manual adjustment by a technician (State 1), or it might require a licensed plumber to replace the downstream PVC P-trap (State 2). To account for this, the execution time $t_i$ is drawn from a mixture distribution, weighted by the physical probability of each state ($p_{i,k}$):
+Just as the inspector's choice of units is random, the time required to complete a maintenance task is never a fixed number.To model this physical reality, we treat execution time $t_i$ as a random variable drawn from a bounded Beta-PERT (Program Evaluation and Review Technique) distribution. PERT is widely used in project management because it relies on three intuitive estimates: an optimistic minimum ($a$), a most likely mode ($m$), and a pessimistic maximum ($b$).
+
+However, tasks often exist in distinctly different physical states. Consider a sink drain: it might simply require a quick manual adjustment by a technician (State 1), or it might require a licensed plumber to replace the downstream PVC P-trap (State 2). To account for this, the execution time $t_i$ is drawn from a mixture distribution, weighted by the physical probability of each state ($p_{i,k}$):
 $$f(t_i) = \sum_{k} p_{i,k} \cdot \text{PERT}(t; a_k, m_k, b_k)$$
-Using a single "average time" for such a task would be a fallacy, as it would plan for an event that never actually happens. As illustrated in @fig-multimodal-pert, the mixture distribution correctly captures the bifurcated reality of the repair.
+Using a single "average time" for such a task would be inappropriate, as it would plan for an event that never actually happens. As illustrated in @fig-multimodal-pert, the mixture distribution correctly captures the bifurcated reality of the repair.
 
 ```{r}
 #| label: fig-multimodal-pert
@@ -779,7 +775,7 @@ ggplot(df, aes(x = Time, y = Density)) +
 
 By mapping these mixture distributions across the entire property, we build a comprehensive dictionary of constraints. The complete operational matrix—detailing baseline defect rates, multi-state PERT parameters, material costs, and prerequisite dependencies—is defined in @tbl-tasks-config.
 
-This master configuration encodes tasks realities into the simulation engine. For example, it explicitly maps the physical handoffs between internal technicians adjusting standard sink drains and licensed plumbers replacing downstream PVC P-traps via vendor flags and scheduling lags.
+This master configuration encodes tasks into the simulation engine. For example, it explicitly maps the physical handoffs between internal technicians adjusting standard sink drains and licensed plumbers replacing downstream PVC P-traps via vendor flags and scheduling lags.
 
 When using the interactive table below, expanding the arrow at the left of any task reveals the exact time, cost, and probability parameters driving its Monte Carlo realizations.
 
@@ -816,21 +812,21 @@ datatable(
 
 ## 3.3 Post-Audit Asset Decay
 
-A final, critical parameter embedded within the master configuration (@tbl-tasks-config) is the baseline decay rate (p_decay). In residential properties, a resolved defect does not stay resolved indefinitely. Once a repair is completed and audited at time $t_{end}$, the asset immediately re-enters a state of stochastic wear-and-tear.
+A critical parameter embedded within the master configuration (@tbl-tasks-config) is the baseline decay rate (p_{decay}). In residential properties, a resolved defect does not stay resolved indefinitely. Once a repair is completed and audited at time $t_{end}$, the asset immediately re-enters a state of stochastic deterioration.
 
 We model this defect re-emergence as a Bernoulli (i.e. binary) process over the waiting period $\delta_{decay}$ (the time gap between the completion of the repair and the arrival of the HUD inspector). Given a baseline daily probability of failure $\lambda_{i}$ for task $i$, the probability $P_{redefect}$ that a newly resolved task breaks again before the inspection is:
 $$P_{redefect} = 1 - (1 - \lambda_{i,u}^*)^{\delta_{decay}}$$
 Crucially, this decay is not uniform across the property. The effective daily probability of failure $\lambda_{i,u}^*$ is coupled with the unit's latent state $\phi_u$. This mathematical multiplier actively accelerates the re-emergence of defects in high-impact ("dirty") units:
 $$\lambda_{i,u}^* = \lambda_{i} \cdot \phi_u$$
-This temporal decay creates a severe operational trade-off. Finishing preparations too early maximizes the decay window ($\delta_{decay}$), inflating the probability that critical life-safety items (like a smoke detector or GFCI) will randomly fail before the inspector arrives. Conversely, starting preparations too late constricts the repair window, ensuring a labor backlog.
+Temporal decay creates an operational constraint. Completeing preparations too early maximizes the decay window ($\delta_{decay}$), inflating the probability that critical life-safety items (like a smoke detector or GFCI) will randomly fail before the inspector arrives. Conversely, starting preparations too late constricts the repair window, creating a labor backlog.
 
-Beyond stochastic time estimates and decay rates, the master configuration table (@tbl-tasks-config) contains one more vital operational constraint: the prerequisites column. Real-world maintenance cannot be executed in a random order. To enforce the physical sequence of repairs, the simulation translates these prerequisites into a Directed Acyclic Graph (DAG), enforcing the rigid "order of operations" required to prep a unit.
+Beyond stochastic time estimates and decay rates, the master configuration table (@tbl-tasks-config) contains one more operational constraint: the prerequisites column. Maintenance work cannot be executed in a random order. To enforce the physical sequence of repairs, the simulation translates these prerequisites into a Directed Acyclic Graph (DAG), defining the sequence of tasks required to prep a unit.
 
 ## 3.4 Resource Mapping and Graph Topology (DAG){#sec-dag}
 
-Repairs cannot always happen simultaneously or in random order. For example, you cannot paint a wall before patching the drywall, and you cannot patch the drywall before fixing the plumbing leak behind it.
+Repairs are frequently subject to sequential dependencies. For example, drywall patching cannot occur until underlying plumbing leaks are resolved, and painting must follow the drywall compound's cure time.
 
-To model this operational reality, we organize maintenance tasks into a Directed Acyclic Graph (DAG). In simpler terms, a DAG is a strict, one-way flowchart that maps out the required "order of operations." Each task (mathematically called a vertex, $V_i$) requires an expected execution time $t_i$ and a material cost $m_i$.
+To model this, we organize maintenance tasks into a Directed Acyclic Graph (DAG), that maps out the required order of operations. Each task (a vertex, $V_i$) requires a stochastic execution time $t_i$ and a material cost $m_i$.
 
 ```{mermaid}
 %%| fig-cap: "A simple Directed Acyclic Graph (DAG) illustrating mandatory task sequences."
@@ -845,9 +841,9 @@ flowchart LR
     style D fill:#f9f9f9,stroke:#333,stroke-width:2px
 ```
 
-When applied to the entire NSPIRE catalog, the complexity of maintenance becomes more apparent. In @fig-dag-network below, the algorithm scales the size of each node by its mathematical out-degree: the number of downstream tasks that physically depend on it.
+When applied to the entire NSPIRE catalog, the topological complexity of maintenance routing becomes apparent. In @fig-dag-network, the algorithm scales the size of each node by its out-degree: the volume of downstream tasks that physically depend upon its completion.
 
-Large nodes represent bottlenecks. For example, EL-02 (the Breaker Box) acts as a prerequisite hub. If this root node is not cleared first, it initiates a cascading scheduling freeze, preventing technicians from executing subsequent tasks like GFCI replacements, exhaust fan repairs, or lighting installations.
+Large nodes represent bottlenecks. For example, EL-02 (the Breaker Box) is a prerequisite hub. If this root node is not resolved, it initiates a cascading scheduling freeze, preventing technicians from executing subsequent tasks like GFCI replacements, exhaust fan repairs, or lighting installations.
 
 ```{r}
 #| label: fig-dag-network
@@ -901,30 +897,30 @@ visNetwork(nodes, edges, width = "100%", height = "600px") |>
 
 ### Edge Constraints (Operational Laws)
 
-The arrows connecting these tasks are not just visual lines; they act as rigid operational laws within the simulation engine.
+The directed edges connecting these tasks function as operational constraints within the simulation engine.
 
 * **Sequential Precedence** A directed edge $V_A \to V_B$ requires the start time of $B$ to be $\ge$ the end time of $A$.
   * Example: A technician cannot paint a wall before the drywall compound has fully dried.
 * **Temporal Blocking** Certain vertices impose a local resource freeze, locking a spatial node for a time interval $\Delta t$.
-  * Example: If an external vendor reglazes a tub that physical zone is locked out for a mandatory cure time. The scheduling engine forces internal technicians to re-route to other tasks or units.
+  * Example: If an external vendor reglazes a tub that physical zone is locked out for a mandatory cure time. The scheduling engine forces labor to re-route to other tasks or units.
 * **Mutually Exclusive Pruning** If a higher-order vertex $V_{replace}$ is activated, redundant child vertices $V_{repair}$ are mathematically pruned ($t_{repair} \to 0$).
-  * Example: If an upper kitchen cabinet is critically broken and flagged for full replacement, the system instantly cancels minor, redundant adjustments to its hinges or doors, preventing the budget from absorbing phantom labor hours.
+  * Example: If an upper kitchen cabinet is critically broken and flagged for full replacement, the system instantly cancels minor, redundant adjustments to its hinges or doors, preventing the assignment of unnecessary labor expenditures.
 
 ## 3.5 Execution Capacity and Quality Control
 
-Even with a perfectly sequenced DAG, execution is bound by strict physical limits: the time available to work, the reliance on external vendors, and the inevitability of human error.
+Even with a sequenced DAG, execution is bound by strict physical limits: the time available to work, vendor dependence, and human errors.
 
 ### Repair Capacity and Vendor Bottlenecks
 
-The model assumes a maintenance repair window defined by $t_{start}$ (commencement of internal repairs) and $t_{end}$ (completion of repairs and audit). Given a standard baseline labor capacity $R_{base}$ (hours/unit/day), the total labor capacity $\text{Cap}$ available for the maintenance cycle is linearly proportional to the duration of this window:
+The model defines a maintenance repair window constrained by $t_{start}$ (commencement of repairs) and $t_{end}$ (completion of repairs and audit). Given a baseline labor capacity $R_{base}$ (hours/unit/day), the total labor capacity $\text{Cap}$ available for the maintenance cycle is linearly proportional to the duration of this window:
 $$\text{Cap} = R_{base} \cdot (t_{start} - t_{end})$$
 Tasks requiring labor hours $T_{total} > \text{Cap}$ result in a scheduling backlog, forcing the system to abandon lower-severity items to prioritize high-penalty (LT/S) defects.
 
-This capacity is further choked by tasks requiring external licensing. For example, while a technician handles a sink drain, repairing the downstream PVC P-trap requires a licensed plumber. When a node evaluates to this severe state, internal labor drops to zero ($t_{internal} \to 0$), but a schedule lag is injected based on a Uniform distribution: $L \sim \text{Uniform}(l_{min}, l_{max})$ days. Furthermore, a mandatory spatial lockout is triggered (e.g., a 24-hour cure time after glazing), forcing the DAG to re-route technicians and accelerating the exhaustion of the remaining timeline.
+This capacity is further constrained by tasks requiring external licensing. For example, while a technician handles a sink drain, repairing the downstream PVC P-trap requires a licensed plumber. When a node evaluates to this severe state, internal labor drops to zero ($t_{internal} \to 0$), but a schedule lag is injected based on a Uniform distribution: $L \sim \text{Uniform}(l_{min}, l_{max})$ days. Furthermore, a mandatory spatial lockout is triggered (e.g., a 24-hour cure time after glazing), forcing the DAG to re-route technicians and accelerating the exhaustion of the remaining timeline.
 
 ### Human Error and Audit Efficacy
 
-Execution of a task does not guarantee absolute resolution. A task has a baseline physical probability ($p_{err}$) of being missed or improperly repaired. We quantify quality control using a formal internal audit efficacy parameter, $\alpha_\text{audit} \in [0, 1]$, representing the probability that the pre-inspection internal team detects and successfully mitigates a surviving defect.
+Execution of a task does not guarantee resolution. A task has a baseline physical probability ($p_{err}$) of being missed or improperly repaired. We quantify quality control using a formal internal audit efficacy parameter, $\alpha_\text{audit} \in [0, 1]$, representing the probability that the pre-inspection internal team detects and successfully mitigates a surviving defect.
 
 **Serial Execution (Single Technician)** The probability that a defect survives the initial repair attempt and remains undetected by the audit phase is:
 $$P(\text{Survive}) = (1 - \alpha_\text{audit}) \cdot p_{err}$$
@@ -933,7 +929,7 @@ $$P(\text{Survive}) = (1 - \alpha_\text{audit}) \cdot p_{err}^2$$
 
 ## 3.6 Tenant Heterogeneity and Predictive Risk
 
-Asset deterioration is not uniform across a property. Baseline probabilities assume a standard deterioration rate, but operational reality dictates that damage clusters around specific tenant behaviors.
+Asset deterioration is rarely uniform across a property. Baseline probabilities assume a standard deterioration rate, but damage might clusters around specific tenant behaviors.
 
 ### The Bimodal Risk of Tenant Behavior
 
@@ -945,23 +941,35 @@ Note that the default simulation parameters assume tenant homogeneity. The effec
 
 ### The Danger of Silence (Latent Covariates)
 
-A lack of historical tenant reporting might mask severe deferred maintenance. To combat this, we could use historical service request volume $W_u$ as a proxy to infer the probability that a unit belongs to the high-impact "dirty" latent state ($\phi_{dirty}$).
+A lack of historical tenant reporting might mask severe deferred maintenance. To account for this, historical service request volume $W_u$ might serve as a proxy to infer the probability that a unit belongs to the high-impact latent state ($\phi_{dirty}$).
 
 We could define the unit-specific probability $\pi_u$ as a logistic function of service requests $W_u$:
 $$\pi_u = P(\phi_u = \phi_{dirty} \vert{} W_u) = \text{logit}^{-1}(\alpha - \beta W_u)$$
 Where $\alpha$ and $\beta$ are calibrated tuning parameters. For units with extremely low reporting ($W_u \to 0$), the prior probability of being in the "dirty" state dramatically increases, signaling a high likelihood of latent defects.
 
-This feature is **not used in this document**. Exploring it would be an interesting exercise but it would certainly require access to actual tenant data.
+This feature is **not utilized in this document**. Exploring it would be an interesting exercise but it would require testing with historical tenant data.
+
+### Modeling Tenant Heterogeneity
+
+Let $p$ be the proportion of clean units and $R$ be the severity ratio of a destructive unit (set to $20.0$). The expected defect multipliers for clean units ($\mu_c$) and destructive units ($\mu_d$) must satisfy:
+
+$$p \mu_c + (1 - p) \mu_d = 1.0$$
+
+By substituting $\mu_d = R \mu_c$, we dynamically calculate the baseline multiplier for the clean units for any given tenant mixture:
+
+$$\mu_c = \frac{1}{p + R(1 - p)}$$
+
+Consequently, as destructive tenants are introduced and generate severe defect clusters, standard units become proportionally cleaner to offset them.
 
 ## 3.7 Risk Analysis
 
-Moving beyond deterministic score projections, this model quantifies operational risk by treating property performance as a stochastic process. By leveraging Monte Carlo simulation, we assess not only the expected outcome but the probability of regulatory non-compliance.
+Moving beyond deterministic score projections, this model quantifies operational risk by evaluating property score as a stochastic process. By leveraging Monte Carlo simulation, we assess not only the expected outcome but the probability of regulatory non-compliance.
 
 ### Quantification of Failure Risk
 
 We define the failure event as $S_{eff} < 60$. Due to the non-linear interaction of random unit sampling, defect emergence probabilities, and repair quality, the effective inspection score $S_{eff}$ is a random variable. We estimate the probability of failure ($P_{fail}$) by simulating $K = 1,000$ independent inspection realizations:
 $$P_{fail} = \frac{1}{K} \sum_{i=1}^{K} I(S_{eff,i} < 60)$$
-where $I(\cdot)$ is again the indicator function. This allows us to map the property's risk profile against the HUD enforcement threshold, providing a granular view of the likelihood of catastrophic failure that a mean-based score effectively masks.
+where $I(\cdot)$ is the indicator function. This allows the model to map the property's risk profile against the HUD enforcement threshold, providing an estimation of failure probability.
 
 ### Quantifying Volatility
 
@@ -979,7 +987,7 @@ A property may exhibit a high median score while maintaining a high $\tau$, iden
 
 The Tail Drop Metric $\tau$ is a systemic output of our model, functionally defined by the interaction of our control and stochastic parameters:
 $$\tau = f(n(N), \alpha_\text{audit}, \pi, \phi_{dirty})$$
-This sensitivity function captures how variance in the HUD sampling tier $n(N)$, human error in pre-inspection audit ($\alpha_\text{audit}$), and the underlying distribution of tenant impact ($\pi, \phi_{dirty}$) propagate into downside performance risk. 
+This sensitivity function captures how variance in the HUD sampling tier $n(N)$, human error in pre-inspection audit ($\alpha_\text{audit}$), and the underlying distribution of tenant impact ($\pi, \phi_{dirty}$) propagate into downside performance risk. Therefore, $\tau$ can be seen as quantifying score uncertainty or volatility.
 
 # 4 References
 
@@ -992,7 +1000,7 @@ The Monte Carlo engine is driven by four primary configuration files. These file
 
 ## A.1 Task Modalities (The DAG Configuration)
 
-The task parameters—including expected baseline durations, material costs, and prerequisite dependencies—are defined in tasks_config.csv. A complete view of these parameters is available in Section 3 (@tbl-tasks-config).
+The task parameters—including stochastic duration model parameters, material costs, and prerequisite dependencies—are defined in tasks_config.csv. A complete view of these parameters is available in Section 3 (@tbl-tasks-config).
 
 ## A.2 Spatial Organization (Floorplans)
 
